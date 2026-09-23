@@ -14,7 +14,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('user_task_weights', function (Blueprint $table) {
+        Schema::create('task_user_weights', function (Blueprint $table) {
             $table->id();
             $table->foreignIdFor(Household::class)->constrained('households');
             $table->foreignIdFor(User::class)->constrained('users');
@@ -31,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('user_task_weights');
+        Schema::dropIfExists('task_user_weights');
     }
 };
