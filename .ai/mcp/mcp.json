@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "laravel-boost": {
+      "command": "/Users/papparon/Library/Application Support/Herd/bin/php85",
+      "args": [
+        "/Users/papparon/Herd/flatshare-duty-backend/artisan",
+        "boost:mcp"
+      ]
+    }
+  }
+}

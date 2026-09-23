@@ -1,0 +1,54 @@
+<?php
+
+namespace App\Models;
+
+use App\Observers\HouseholdObserver;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Random\RandomException;
+
+#[Fillable(['name', 'join_code', 'created_by'])]
+#[ObservedBy([HouseholdObserver::class])]
+class Household extends Model
+{
+    /**
+     * @throws RandomException
+     */
+    public static function generateUniqueJoinCode(): string
+    {
+        do {
+            $code = str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
+        } while (self::where('join_code', $code)->exists());
+
+        return $code;
+    }
+
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'household_users');
+    }
+
+    public function householdUsers(): HasMany
+    {
+        return $this->hasMany(HouseholdUser::class);
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    public function rewards(): HasMany
+    {
+        return $this->hasMany(Reward::class);
+    }
+}
