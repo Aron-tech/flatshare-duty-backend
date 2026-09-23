@@ -25,6 +25,7 @@ return new class extends Migration
             $table->foreignIdFor(Category::class)->nullable()->constrained('categories');
             $table->string('icon')->nullable();
             $table->unsignedMediumInteger('duration_minutes');
+            $table->string('difficulty', 10);
             $table->unsignedMediumInteger('base_points');
             $table->boolean('is_recurring')->default(false);
             $table->unsignedMediumInteger('recurrence_interval')->nullable();

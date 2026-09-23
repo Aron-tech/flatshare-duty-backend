@@ -17,7 +17,7 @@ enum LanguageEnum: string
      */
     public static function getOptions(): array
     {
-        return array_map(fn (self $role): array => ['value' => $role->value, 'label' => $role->getName()], self::cases());
+        return array_map(fn (self $lang): array => ['value' => $lang->value, 'label' => $lang->getName()], self::cases());
     }
 
     public static function fromLocale(string $locale): ?self

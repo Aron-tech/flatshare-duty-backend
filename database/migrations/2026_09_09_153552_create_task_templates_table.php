@@ -19,8 +19,9 @@ return new class extends Migration
             $table->jsonb('description');
             $table->foreignIdFor(Category::class)->constrained('categories');
             $table->string('icon');
-            $table->unsignedMediumInteger('default_duration_minutes');
-            $table->unsignedMediumInteger('default_base_points');
+            $table->unsignedMediumInteger('duration_minutes');
+            $table->string('difficulty', 10);
+            $table->unsignedMediumInteger('base_points');
             $table->timestamps();
         });
     }

@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Observers\TaskTemplateObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Translatable\Attributes\Translatable;
 use Spatie\Translatable\HasTranslations;
 
 #[Translatable('name', 'description')]
-#[Fillable(['name', 'description', 'category_id', 'icon', 'default_duration_minutes', 'default_base_points'])]
+#[Fillable(['name', 'description', 'category_id', 'icon', 'duration_minutes', 'difficulty', 'base_points'])]
+#[ObservedBy([TaskTemplateObserver::class])]
 class TaskTemplate extends Model
 {
     use HasTranslations;
@@ -18,5 +21,11 @@ class TaskTemplate extends Model
     public static function invalidateCache(): void
     {
         cache()->forget(self::CACHE_KEY);
+    }
+
+    public function calculateBasePoints(): self
+    {
+        $this->base_points = round($this->difficulty * $this->duration_minutes);
+        return $this;
     }
 }

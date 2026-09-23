@@ -3,22 +3,33 @@
 namespace App\Models;
 
 use App\Enums\RecurrenceUnitEnum;
+use App\Enums\TaskDifficultyEnum;
+use App\Observers\TaskObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['task_template_id', 'household_id', 'created_by', 'name', 'description', 'category_id', 'icon', 'duration_minutes', 'base_points', 'is_recurring', 'recurrence_interval', 'recurrence_unit'])]
+#[Fillable(['task_template_id', 'household_id', 'created_by', 'name', 'description', 'category_id', 'icon', 'duration_minutes', 'difficulty', 'base_points', 'is_recurring', 'recurrence_interval', 'recurrence_unit'])]
+#[ObservedBy([TaskObserver::class])]
 class Task extends Model
 {
     protected function casts(): array
     {
         return [
             'duration_minutes' => 'int',
+            'difficulty' => TaskDifficultyEnum::class,
             'base_points' => 'int',
             'recurrence_interval' => 'int',
             'is_recurring' => 'boolean',
             'recurrence_unit' => RecurrenceUnitEnum::class,
         ];
+    }
+
+    public function calculateBasePoints(): self
+    {
+        $this->base_points = round($this->difficulty * $this->duration_minutes);
+        return $this;
     }
 
     public static function loadFromTemplate(TaskTemplate $task_template, array $data = [], ?string $locale = null): self

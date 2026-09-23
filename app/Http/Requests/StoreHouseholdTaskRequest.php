@@ -23,7 +23,7 @@ class StoreHouseholdTaskRequest extends FormRequest
             'category_id' => ['nullable', 'int', 'exists:categories,id'],
             'icon' => ['nullable', 'string', 'max:255'],
             'duration_minutes' => ['required', 'int', 'min:1'],
-            'base_points' => ['required', 'int', 'min:1'],
+            'difficulty' => ['required', 'string', 'min:3', 'max:10'],
             'is_recurring' => ['nullable', 'boolean'],
             'recurrence_interval' => ['nullable', 'int', 'min:1'],
             'recurrence_unit' => ['nullable', new Enum(RecurrenceUnitEnum::class)]

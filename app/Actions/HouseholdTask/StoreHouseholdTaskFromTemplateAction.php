@@ -21,7 +21,6 @@ class StoreHouseholdTaskFromTemplateAction
         $household_user = HouseholdUser::query()->where('user_id', $user->id)->where('household_id', $household->id)->first();
         if (!$household_user) return $household_user;
         $task = Task::loadFromTemplate($task_template);
-        $task->created_by = $user->id;
         return DB::transaction(fn () => $household->tasks()->save($task));
     }
 
