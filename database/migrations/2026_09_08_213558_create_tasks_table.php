@@ -30,6 +30,8 @@ return new class extends Migration
             $table->boolean('is_recurring')->default(false);
             $table->unsignedMediumInteger('recurrence_interval')->nullable();
             $table->string('recurrence_unit', 10)->nullable();
+            $table->unsignedSmallInteger('max_user')->default(1);
+            $table->jsonb('data')->nullable();
             $table->timestamps();
         });
     }

@@ -10,7 +10,7 @@ use Spatie\Translatable\Attributes\Translatable;
 use Spatie\Translatable\HasTranslations;
 
 #[Translatable('name', 'description')]
-#[Fillable(['name', 'description', 'category_id', 'icon', 'duration_minutes', 'difficulty', 'base_points'])]
+#[Fillable(['name', 'description', 'category_id', 'icon', 'duration_minutes', 'difficulty', 'base_points', 'max_user'])]
 #[ObservedBy([TaskTemplateObserver::class])]
 class TaskTemplate extends Model
 {
@@ -26,6 +26,7 @@ class TaskTemplate extends Model
     public function calculateBasePoints(): self
     {
         $this->base_points = round($this->difficulty * $this->duration_minutes);
+
         return $this;
     }
 }

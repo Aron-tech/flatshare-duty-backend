@@ -6,6 +6,7 @@ use App\Enums\LanguageEnum;
 use App\Enums\RoleEnum;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -17,13 +18,18 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'language' => LanguageEnum::cases(),
+            'language' => LanguageEnum::class,
         ];
     }
 
     public function households(): BelongsToMany
     {
         return $this->belongsToMany(Household::class, 'household_users');
+    }
+
+    public function pushTokens(): HasMany
+    {
+        return $this->hasMany(PushToken::class);
     }
 
     public function isAdminOf(Household|int $household): bool

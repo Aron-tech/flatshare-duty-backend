@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\DataTrait;
 use App\Enums\RecurrenceUnitEnum;
 use App\Enums\TaskDifficultyEnum;
 use App\Observers\TaskObserver;
@@ -9,11 +10,14 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['task_template_id', 'household_id', 'created_by', 'name', 'description', 'category_id', 'icon', 'duration_minutes', 'difficulty', 'base_points', 'is_recurring', 'recurrence_interval', 'recurrence_unit'])]
+#[Fillable(['task_template_id', 'household_id', 'created_by', 'name', 'description', 'category_id', 'icon', 'duration_minutes', 'difficulty', 'base_points', 'is_recurring', 'recurrence_interval', 'recurrence_unit', 'max_user', 'data'])]
 #[ObservedBy([TaskObserver::class])]
 class Task extends Model
 {
+    use DataTrait;
+
     protected function casts(): array
     {
         return [
@@ -23,12 +27,15 @@ class Task extends Model
             'recurrence_interval' => 'int',
             'is_recurring' => 'boolean',
             'recurrence_unit' => RecurrenceUnitEnum::class,
+            'max_user' => 'int',
+            'data' => 'array',
         ];
     }
 
     public function calculateBasePoints(): self
     {
         $this->base_points = round($this->difficulty * $this->duration_minutes);
+
         return $this;
     }
 
@@ -42,7 +49,7 @@ class Task extends Model
             'description' => $task_template->getTranslation('description', $locale),
         ];
 
-        return (new self())->forceFill(array_merge($template_attributes, $translations, $data));
+        return (new self)->forceFill(array_merge($template_attributes, $translations, $data));
     }
 
     public function taskTemplate(): BelongsTo
@@ -54,6 +61,7 @@ class Task extends Model
     {
         return $this->belongsTo(Household::class);
     }
+
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
@@ -62,5 +70,10 @@ class Task extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function userWeights(): HasMany
+    {
+        return $this->hasMany(TaskUserWeight::class);
     }
 }

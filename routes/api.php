@@ -14,6 +14,9 @@ use App\Actions\HouseholdTask\StoreHouseholdTaskAction;
 use App\Actions\HouseholdUser\DeleteHouseholdUserAction;
 use App\Actions\HouseholdUser\ListHouseholdUsersAction;
 use App\Actions\HouseholdUser\UpdateHouseholdUserAction;
+use App\Actions\PushToken\DeletePushTokenAction;
+use App\Actions\PushToken\StorePushTokenAction;
+use App\Actions\StoreTaskUserWeightAction;
 use App\Actions\TaskTemplate\ListTaskTemplatesAction;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -22,6 +25,11 @@ Route::post('/auth/workos', AuthenticateWorkOsUserAction::class);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('user/me', [UserController::class, 'me']);
+
+    Route::prefix('push-tokens')->group(function () {
+        Route::post('/', StorePushTokenAction::class);
+        Route::delete('/', DeletePushTokenAction::class);
+    });
 
     Route::prefix('households')->group(function () {
         Route::get('/', ListHouseholdsAction::class);
@@ -34,10 +42,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
         Route::get('/{household}/users', ListHouseholdUsersAction::class);
 
-        Route::get('{household}/tasks', ListHouseholdTasksAction::class);
-        Route::post('{household}/tasks', StoreHouseholdTaskAction::class);
-        Route::post('{household}/tasks/{task_template}', StoreHouseholdTaskAction::class);
-        Route::delete('{household}/tasks', DeleteHouseholdTaskAction::class);
+        Route::prefix('/{household}/tasks')->group(function () {
+            Route::get('/', ListHouseholdTasksAction::class);
+            Route::post('/', StoreHouseholdTaskAction::class);
+            Route::post('/{task_template}', StoreHouseholdTaskAction::class);
+            Route::delete('/', DeleteHouseholdTaskAction::class);
+
+            Route::prefix('/{task}/user-weight')->group(function () {
+                Route::post('/', StoreTaskUserWeightAction::class);
+            });
+        });
     });
 
     Route::prefix('task-templates')->group(function () {

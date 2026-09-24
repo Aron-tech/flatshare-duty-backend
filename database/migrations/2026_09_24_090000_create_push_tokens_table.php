@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\TaskInstance;
 use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -13,14 +12,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('task_instance_users', function (Blueprint $table) {
+        Schema::create('push_tokens', function (Blueprint $table) {
             $table->id();
-            $table->foreignIdFor(TaskInstance::class)->constrained('task_instances');
-            $table->foreignIdFor(User::class)->constrained('users');
-            $table->timestamp('completed_at')->nullable();
+            $table->foreignIdFor(User::class)->constrained('users')->cascadeOnDelete();
+            $table->string('token')->unique();
+            $table->string('platform', 10);
             $table->timestamps();
-
-            $table->unique(['task_instance_id', 'user_id']);
         });
     }
 
@@ -29,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('task_instance_users');
+        Schema::dropIfExists('push_tokens');
     }
 };

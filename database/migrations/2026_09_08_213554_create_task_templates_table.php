@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\Category;
-use App\Models\Household;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -22,6 +21,7 @@ return new class extends Migration
             $table->unsignedMediumInteger('duration_minutes');
             $table->string('difficulty', 10);
             $table->unsignedMediumInteger('base_points');
+            $table->unsignedSmallInteger('max_user')->default(1);
             $table->timestamps();
         });
     }
