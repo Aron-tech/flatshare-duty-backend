@@ -20,7 +20,6 @@ return new class extends Migration
             $table->foreignIdFor(User::class)->constrained('users');
             $table->foreignIdFor(Task::class)->constrained('tasks');
             $table->string('weight', 10);
-            $table->unsignedSmallInteger('frequency')->default(0);
             $table->timestamps();
 
             $table->unique(['household_id', 'user_id', 'task_id']);

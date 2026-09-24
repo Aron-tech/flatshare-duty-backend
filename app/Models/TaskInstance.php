@@ -6,6 +6,7 @@ use App\Enums\TaskInstanceStatusEnum;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['task_id', 'household_id', 'status', 'due_at', 'completed_at'])]
 class TaskInstance extends Model
@@ -27,5 +28,10 @@ class TaskInstance extends Model
     public function household(): BelongsTo
     {
         return $this->belongsTo(Household::class);
+    }
+
+    public function userWeights(): HasMany
+    {
+        return $this->hasMany(TaskUserWeight::class, 'id', 'task_id');
     }
 }

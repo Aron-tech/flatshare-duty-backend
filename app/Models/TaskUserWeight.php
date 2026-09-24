@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['household_id', 'user_id', 'task_id', 'weight', 'frequency'])]
+#[Fillable(['household_id', 'user_id', 'task_id', 'weight'])]
 class TaskUserWeight extends Model
 {
     protected function casts(): array
