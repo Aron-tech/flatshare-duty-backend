@@ -1,6 +1,8 @@
 <?php
 
 use App\Actions\AuthenticateWorkOsUserAction;
+use App\Actions\ClaimTaskInstanceAction;
+use App\Actions\GetHouseholdUserAction;
 use App\Actions\Household\DeleteHouseholdAction;
 use App\Actions\Household\GenerateHouseholdQrCodeAction;
 use App\Actions\Household\JoinHouseholdAction;
@@ -14,6 +16,7 @@ use App\Actions\HouseholdTask\StoreHouseholdTaskAction;
 use App\Actions\HouseholdUser\DeleteHouseholdUserAction;
 use App\Actions\HouseholdUser\ListHouseholdUsersAction;
 use App\Actions\HouseholdUser\UpdateHouseholdUserAction;
+use App\Actions\ListTaskInstancesAction;
 use App\Actions\PushToken\DeletePushTokenAction;
 use App\Actions\PushToken\StorePushTokenAction;
 use App\Actions\StoreTaskUserWeightAction;
@@ -41,6 +44,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('/{household}', DeleteHouseholdAction::class);
 
         Route::get('/{household}/users', ListHouseholdUsersAction::class);
+        Route::get('/{household}/me', GetHouseholdUserAction::class);
+
+        Route::prefix('/{household}/task-instances')->group(function () {
+            Route::get('/', ListTaskInstancesAction::class);
+            Route::post('/{task_instance}/claim', ClaimTaskInstanceAction::class);
+        });
 
         Route::prefix('/{household}/tasks')->group(function () {
             Route::get('/', ListHouseholdTasksAction::class);

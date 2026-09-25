@@ -3,16 +3,21 @@
         "claude_code",
         "junie"
     ],
-    "cloud": true,
+    "cloud": false,
     "guidelines": true,
     "mcp": true,
     "nightwatch": false,
+    "packages": [
+        "lorisleiva/laravel-actions",
+        "spatie/laravel-translatable"
+    ],
     "sail": false,
     "skills": [
         "infer-conventions",
-        "deploying-to-cloud",
         "laravel-best-practices",
         "testing-best-practices",
-        "tailwindcss-development"
+        "tailwindcss-development",
+        "laravel-actions",
+        "translatable-development"
     ]
 }

@@ -8,6 +8,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property ?int $points Calculated for the current user, see CalculateTaskPointsAction.
+ */
 #[Fillable(['task_id', 'household_id', 'status', 'due_at', 'completed_at'])]
 class TaskInstance extends Model
 {
@@ -30,8 +33,13 @@ class TaskInstance extends Model
         return $this->belongsTo(Household::class);
     }
 
+    public function taskInstanceUsers(): HasMany
+    {
+        return $this->hasMany(TaskInstanceUser::class);
+    }
+
     public function userWeights(): HasMany
     {
-        return $this->hasMany(TaskUserWeight::class, 'id', 'task_id');
+        return $this->hasMany(TaskUserWeight::class, 'task_id', 'task_id');
     }
 }

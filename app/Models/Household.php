@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use App\Actions\CalculateHouseholdMinPointsAction;
 use App\Observers\HouseholdObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -25,6 +27,14 @@ class Household extends Model
         } while (self::where('join_code', $code)->exists());
 
         return $code;
+    }
+
+    /**
+     * The points every member has to earn in a week, calculated from the household's tasks.
+     */
+    protected function minPoints(): Attribute
+    {
+        return Attribute::get(fn (): int => CalculateHouseholdMinPointsAction::run($this));
     }
 
     public function users(): BelongsToMany
@@ -50,5 +60,10 @@ class Household extends Model
     public function rewards(): HasMany
     {
         return $this->hasMany(Reward::class);
+    }
+
+    public function taskInstances(): HasMany
+    {
+        return $this->hasMany(TaskInstance::class);
     }
 }

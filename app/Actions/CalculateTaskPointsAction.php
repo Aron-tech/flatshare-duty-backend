@@ -2,8 +2,11 @@
 
 namespace App\Actions;
 
+use App\Enums\TaskUserWeightEnum;
+use App\Models\Task;
 use App\Models\TaskInstance;
 use App\Models\TaskUserWeight;
+use App\Models\User;
 use Carbon\CarbonInterface;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -12,22 +15,32 @@ class CalculateTaskPointsAction
     use AsAction;
 
     /**
+     * Calculates the user's points for a task or a task instance.
+     * A task instance also adds the overdue bounty based on its due date.
      * Uses the task's eager loaded userWeights relation when available,
      * so listing many tasks does not run a query per task.
      */
-    public function handle(TaskUserWeight $task_user_weight, ?TaskInstance $task_instance = null, bool $is_solo = false): ?int
+    public function handle(Task|TaskInstance $task_or_instance, User $user, bool $is_solo = false): ?int
     {
-        return $this->calculate($task_user_weight->task->base_points, $task_user_weight, $task_instance?->due_at, $is_solo);
+        $task = $task_or_instance instanceof TaskInstance ? $task_or_instance->task : $task_or_instance;
+        $due_at = $task_or_instance instanceof TaskInstance ? $task_or_instance->due_at : null;
+
+        return $this->calculate(
+            $task->base_points,
+            $this->findUserWeight($task, $user)?->weight,
+            $task->getData('frequency', 0),
+            $due_at,
+            $is_solo,
+        );
     }
 
-    public function calculate(int $base_points, TaskUserWeight $task_user_weight, ?CarbonInterface $due_at = null, bool $is_solo = false): int
+    public function calculate(int $base_points, ?TaskUserWeightEnum $weight, int $frequency = 0, ?CarbonInterface $due_at = null, bool $is_solo = false): ?int
     {
-        $weight_multiplier = $task_user_weight->weight->multiplier();
-        $frequency_multiplier = $this->getFrequencyMultiplier($task_user_weight->task->getData('frequency', 0));
-        $bounty_multiplier = $this->getBountyMultiplier($due_at);
+        if (! $weight) {
+            return null;
+        }
 
-        $combined_multiplier = $weight_multiplier * $frequency_multiplier * $bounty_multiplier;
-
+        $combined_multiplier = $weight->multiplier() * $this->getFrequencyMultiplier($frequency) * $this->getBountyMultiplier($due_at);
         $clamped_multiplier = max(0.50, min($combined_multiplier, 1.60));
 
         $points = $base_points * $clamped_multiplier;
@@ -37,6 +50,15 @@ class CalculateTaskPointsAction
         }
 
         return (int) round($points);
+    }
+
+    private function findUserWeight(Task $task, User $user): ?TaskUserWeight
+    {
+        if ($task->relationLoaded('userWeights')) {
+            return $task->userWeights->firstWhere('user_id', $user->id);
+        }
+
+        return $task->userWeights()->where('user_id', $user->id)->first();
     }
 
     private function getFrequencyMultiplier(int $frequency): float
