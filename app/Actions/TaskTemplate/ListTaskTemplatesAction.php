@@ -3,7 +3,6 @@
 namespace App\Actions\TaskTemplate;
 
 use App\Models\TaskTemplate;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -24,8 +23,6 @@ class ListTaskTemplatesAction
             $task_templates = $this->handle();
 
             return response()->json(['task_templates' => $task_templates]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
         } catch (\Throwable $e) {
             report($e);
 

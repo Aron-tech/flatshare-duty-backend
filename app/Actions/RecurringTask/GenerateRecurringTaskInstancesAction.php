@@ -34,6 +34,7 @@ class GenerateRecurringTaskInstancesAction
             ->where('is_recurring', true)
             ->whereNotNull('recurrence_interval')
             ->whereNotNull('recurrence_unit')
+            ->whereHas('household')
             ->with('household')
             ->lazyById()
             ->each(function (Task $task) use (&$created) {

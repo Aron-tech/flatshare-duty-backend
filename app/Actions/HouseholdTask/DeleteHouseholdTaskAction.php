@@ -27,7 +27,7 @@ class DeleteHouseholdTaskAction
 
         return DB::transaction(function () use ($task) {
             $pending_instances = $task->taskInstances()->where('status', TaskInstanceStatusEnum::PENDING);
-            TaskInstanceUser::query()->whereIn('task_instance_id', $pending_instances->select('id'))->delete();
+            TaskInstanceUser::query()->whereIn('task_instance_id', (clone $pending_instances)->select('id'))->delete();
             $pending_instances->delete();
             $task->userWeights()->delete();
 

@@ -26,14 +26,15 @@ class ListHouseholdRewardsAction
             throw new AuthorizationException(__('app.no_permission'));
         }
 
-        $averages = CalculateRewardDifficultyAction::make()->householdAverages($household);
+        $calculate_difficulty = CalculateRewardDifficultyAction::make();
+        $averages = $calculate_difficulty->householdAverages($household);
 
         return $household->rewards()
             ->with('user')
             ->get()
             ->each(fn (Reward $reward) => $reward->forceFill([
                 'is_editing' => $reward->isBeingEdited(),
-                'difficulty' => CalculateRewardDifficultyAction::make()->evaluate($averages, $reward->points_cost),
+                'difficulty' => $calculate_difficulty->evaluate($averages, $reward->points_cost),
             ]));
     }
 

@@ -15,12 +15,14 @@ class DeleteHouseholdUserAction
 {
     use AsAction;
 
+    /**
+     * A member can remove themselves, anyone else can only be removed by an admin of the household.
+     */
     public function handle(User $user, HouseholdUser $household_user): bool
     {
-        $is_removing_creator = $household_user->user_id === $household_user->household->created_by;
         $is_self = $household_user->user_id === $user->id;
 
-        if ($is_removing_creator && ! $is_self && ! $user->isAdminOf($household_user->household_id)) {
+        if (! $is_self && ! $user->isAdminOf($household_user->household_id)) {
             return false;
         }
 

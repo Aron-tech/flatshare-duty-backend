@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\LanguageEnum;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,10 +16,10 @@ class SetAppLocaleMiddleware
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if ($request->user() && $request->user()->language->value) {
-            app()->setLocale($request->user()->language->value);
-        } elseif ($request->header('Accept-Language')) {
-            app()->setLocale($request->header('Accept-Language'));
+        // Only supported languages are accepted, a raw header like "en-US,en;q=0.9" would break the translations.
+        $language = $request->user()?->language ?? LanguageEnum::fromLocale((string) $request->header('Accept-Language'));
+        if ($language) {
+            app()->setLocale($language->value);
         }
 
         return $next($request);

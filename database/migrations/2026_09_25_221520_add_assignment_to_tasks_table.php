@@ -3,6 +3,7 @@
 use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -17,6 +18,12 @@ return new class extends Migration
             $table->foreignIdFor(User::class, 'fixed_user_id')->nullable()->after('assignment_mode')->constrained('users')->nullOnDelete();
             $table->foreignIdFor(User::class, 'last_assigned_user_id')->nullable()->after('fixed_user_id')->constrained('users')->nullOnDelete();
         });
+
+        // SQLite rebuilds the table to add the foreign keys and drops the condition of the partial unique index.
+        if (DB::getDriverName() === 'sqlite') {
+            DB::statement('drop index tasks_household_id_name_unique');
+            DB::statement('create unique index tasks_household_id_name_unique on tasks (household_id, name) where deleted_at is null');
+        }
     }
 
     /**

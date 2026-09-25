@@ -28,18 +28,18 @@ class AuthenticateWorkOsUserAction
         $user = User::updateOrCreate(
             ['email' => $work_os_user->email],
             array_filter([
-                'workos_id'  => $work_os_user->id,
+                'workos_id' => $work_os_user->id,
                 'first_name' => $work_os_user->firstName,
-                'last_name'  => $work_os_user->lastName,
-                'avatar'     => $work_os_user->profilePictureUrl ?: null,
-                'language'   => $language?->value ?? LanguageEnum::HUNGARIAN->value,
-            ], fn ($value) => !is_null($value))
+                'last_name' => $work_os_user->lastName,
+                'avatar' => $work_os_user->profilePictureUrl ?: null,
+                'language' => $language?->value ?? LanguageEnum::HUNGARIAN->value,
+            ], fn ($value) => ! is_null($value))
         );
 
         $token = $user->createToken('mobile-app')->plainTextToken;
 
         return [
-            'user'  => $user,
+            'user' => $user,
             'token' => $token,
         ];
     }
@@ -57,9 +57,10 @@ class AuthenticateWorkOsUserAction
                 'user' => $result['user'],
             ]);
         } catch (\Throwable $e) {
-            return response()->json([
-                'error' => 'Authentication failed: ' . $e->getMessage(),
-            ], 401);
+            // The exception message may contain internal details (e.g. SQL), it is only logged.
+            report($e);
+
+            return response()->json(['message' => __('app.failed_action')], 401);
         }
     }
 }

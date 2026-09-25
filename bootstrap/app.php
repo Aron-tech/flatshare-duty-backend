@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\HouseholdReward\ReleaseStaleRewardEditingAction;
+use App\Actions\RecurringTask\GenerateRecurringTaskInstancesAction;
 use App\Actions\TaskWeightNotification\NotifyUnweightedTasksAction;
 use App\Actions\WeeklyPointGoal\CloseWeeklyPointGoalsAction;
 use App\Actions\WeeklyPointGoal\RemindWeeklyPointGoalsAction;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ReleaseStaleRewardEditingAction::class,
         CloseWeeklyPointGoalsAction::class,
         RemindWeeklyPointGoalsAction::class,
+        GenerateRecurringTaskInstancesAction::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         //
