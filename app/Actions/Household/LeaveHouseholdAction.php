@@ -2,6 +2,7 @@
 
 namespace App\Actions\Household;
 
+use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Models\Household;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -15,7 +16,10 @@ class LeaveHouseholdAction
 
     public function handle(User $user, Household $household): bool
     {
-        return DB::transaction(fn () => (bool) $user->households()->detach($household->id));
+        $has_left = DB::transaction(fn () => (bool) $user->households()->detach($household->id));
+        RecalculateWeeklyPointGoalsAction::run($household);
+
+        return $has_left;
     }
 
     public function asController(Request $request, Household $household): JsonResponse

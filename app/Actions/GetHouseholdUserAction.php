@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Models\Household;
 use App\Models\HouseholdUser;
 use App\Models\User;
@@ -32,7 +33,9 @@ class GetHouseholdUserAction
         try {
             $household_user = $this->handle($request->user(), $household);
 
-            return response()->json(['household_user' => $household_user, 'min_points' => $household->min_points]);
+            $goal = RecalculateWeeklyPointGoalsAction::make()->currentGoals($household)->get($household_user->user_id);
+
+            return response()->json(['household_user' => $household_user, 'min_points' => $goal->target_points ?? 0]);
         } catch (AuthorizationException $e) {
             return response()->json(['message' => $e->getMessage()], 403);
         } catch (\Throwable $e) {

@@ -11,4 +11,5 @@ enum PointTransactionType: string
     case DELEGATION_PENALTY_BURN = 'delegation_penalty_burn';
     case REWARD_REDEMPTION = 'reward_redemption';
     case MISSED_TASK_PENALTY = 'missed_task_penalty';
+    case PENALTY_TASK_COMPLETION = 'penalty_task_completion';
 }

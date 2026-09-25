@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\SerializesTranslationsInLocale;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Translatable\Attributes\Translatable;
@@ -12,6 +13,7 @@ use Spatie\Translatable\HasTranslations;
 class Category extends Model
 {
     use HasTranslations;
+    use SerializesTranslationsInLocale;
 
     public const string CACHE_KEY = 'categories';
 

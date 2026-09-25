@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\CalculateHouseholdMinPointsAction;
+use App\Concerns\LogsModelActivity;
 use App\Observers\HouseholdObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
@@ -11,12 +12,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Random\RandomException;
 
 #[Fillable(['name', 'join_code', 'created_by'])]
 #[ObservedBy([HouseholdObserver::class])]
 class Household extends Model
 {
+    use LogsModelActivity;
+    use SoftDeletes;
+
     /**
      * @throws RandomException
      */
@@ -24,7 +29,7 @@ class Household extends Model
     {
         do {
             $code = str_pad((string) random_int(0, 9999999999), 10, '0', STR_PAD_LEFT);
-        } while (self::where('join_code', $code)->exists());
+        } while (self::withTrashed()->where('join_code', $code)->exists());
 
         return $code;
     }
@@ -39,7 +44,7 @@ class Household extends Model
 
     public function users(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'household_users');
+        return $this->belongsToMany(User::class, 'household_users')->using(HouseholdUser::class)->withTimestamps();
     }
 
     public function householdUsers(): HasMany
@@ -60,6 +65,11 @@ class Household extends Model
     public function rewards(): HasMany
     {
         return $this->hasMany(Reward::class);
+    }
+
+    public function weeklyPointGoals(): HasMany
+    {
+        return $this->hasMany(WeeklyPointGoal::class);
     }
 
     public function taskInstances(): HasMany

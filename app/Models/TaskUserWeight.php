@@ -2,14 +2,20 @@
 
 namespace App\Models;
 
+use App\Concerns\LogsModelActivity;
 use App\Enums\TaskUserWeightEnum;
+use App\Observers\WeeklyPointGoalObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable(['household_id', 'user_id', 'task_id', 'weight'])]
+#[ObservedBy([WeeklyPointGoalObserver::class])]
 class TaskUserWeight extends Model
 {
+    use LogsModelActivity;
+
     protected function casts(): array
     {
         return [

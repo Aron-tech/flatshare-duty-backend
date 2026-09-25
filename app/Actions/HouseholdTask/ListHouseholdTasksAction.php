@@ -14,13 +14,26 @@ class ListHouseholdTasksAction
 {
     use AsAction;
 
+    /**
+     * Lists the tasks of the household for any member, with the user's own weight and the rotation members of each task.
+     *
+     * @throws AuthorizationException
+     */
     public function handle(User $user, Household $household): Collection
     {
-        if (!$user->isAdminOf($household)) {
+        if (! $user->households()->whereKey($household->id)->exists()) {
             throw new AuthorizationException(__('app.no_permission'));
         }
 
-        return $household->tasks()->with('category')->get()->groupBy(fn ($task) => $task->category?->name ?? __('app.other'));
+        return $household->tasks()
+            ->with([
+                'category',
+                'rotations',
+                'userWeights' => fn ($query) => $query->where('user_id', $user->id),
+            ])
+            ->orderBy('name')
+            ->get()
+            ->groupBy(fn ($task) => $task->category?->name ?? __('app.other'));
     }
 
     public function asController(Request $request, Household $household): JsonResponse

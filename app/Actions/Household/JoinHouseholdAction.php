@@ -2,6 +2,7 @@
 
 namespace App\Actions\Household;
 
+use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Enums\RoleEnum;
 use App\Http\Requests\JoinHouseholdRequest;
 use App\Models\Household;
@@ -27,8 +28,9 @@ class JoinHouseholdAction
         }
 
         DB::transaction(
-            fn () => $user->households()->syncWithoutDetaching($household->id, ['role' => RoleEnum::USER])
+            fn () => $user->households()->syncWithoutDetaching([$household->id => ['role' => RoleEnum::USER]])
         );
+        RecalculateWeeklyPointGoalsAction::run($household);
 
         return $household;
     }

@@ -6,6 +6,7 @@ use App\Enums\TaskInstanceStatusEnum;
 use App\Models\Household;
 use App\Models\TaskInstance;
 use App\Models\TaskInstanceUser;
+use App\Models\TaskUserWeight;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -27,6 +28,14 @@ class ClaimTaskInstanceAction
             || ! $user->households()->whereKey($household->id)->exists()
         ) {
             throw new AuthorizationException(__('app.no_permission'));
+        }
+
+        $has_weight = TaskUserWeight::query()
+            ->where('user_id', $user->id)
+            ->where('task_id', $task_instance->task_id)
+            ->exists();
+        if (! $has_weight) {
+            throw new AuthorizationException(__('app.task_weight_required'));
         }
 
         return DB::transaction(function () use ($user, $task_instance) {

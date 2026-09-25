@@ -3,6 +3,7 @@
 namespace App\Actions\HouseholdReward;
 
 use App\Models\Household;
+use App\Models\Reward;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -14,13 +15,26 @@ class ListHouseholdRewardsAction
 {
     use AsAction;
 
+    /**
+     * Lists the household's rewards, each with how hard it is to earn its points.
+     *
+     * @throws AuthorizationException
+     */
     public function handle(User $user, Household $household): Collection
     {
-        if (!$user->households()->where('id', $household->id)->exists()) {
+        if (! $user->households()->whereKey($household->id)->exists()) {
             throw new AuthorizationException(__('app.no_permission'));
         }
 
-        return $household->rewards()->with('user')->get();
+        $averages = CalculateRewardDifficultyAction::make()->householdAverages($household);
+
+        return $household->rewards()
+            ->with('user')
+            ->get()
+            ->each(fn (Reward $reward) => $reward->forceFill([
+                'is_editing' => $reward->isBeingEdited(),
+                'difficulty' => CalculateRewardDifficultyAction::make()->evaluate($averages, $reward->points_cost),
+            ]));
     }
 
     public function asController(Request $request, Household $household): JsonResponse

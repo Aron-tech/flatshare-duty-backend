@@ -2,6 +2,7 @@
 
 namespace App\Actions\HouseholdUser;
 
+use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Models\HouseholdUser;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -23,7 +24,10 @@ class DeleteHouseholdUserAction
             return false;
         }
 
-        return DB::transaction(fn () => $household_user->delete());
+        $is_deleted = DB::transaction(fn () => $household_user->delete());
+        RecalculateWeeklyPointGoalsAction::run($household_user->household);
+
+        return $is_deleted;
     }
 
     public function asController(Request $request, HouseholdUser $household_user): JsonResponse

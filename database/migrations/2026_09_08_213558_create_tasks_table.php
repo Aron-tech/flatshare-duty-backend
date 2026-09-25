@@ -20,7 +20,7 @@ return new class extends Migration
             $table->foreignIdFor(TaskTemplate::class)->nullable()->constrained('task_templates');
             $table->foreignIdFor(Household::class, 'household_id')->constrained('households');
             $table->foreignIdFor(User::class, 'created_by')->constrained('users');
-            $table->string('name', 150);
+            $table->string('name', 150)->unique();
             $table->text('description')->nullable();
             $table->foreignIdFor(Category::class)->nullable()->constrained('categories');
             $table->string('icon')->nullable();
@@ -33,6 +33,8 @@ return new class extends Migration
             $table->unsignedSmallInteger('max_user')->default(1);
             $table->jsonb('data')->nullable();
             $table->timestamps();
+
+            $table->index(['household_id', 'name']);
         });
     }
 

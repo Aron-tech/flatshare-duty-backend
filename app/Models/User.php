@@ -36,7 +36,7 @@ class User extends Authenticatable
 
     public function households(): BelongsToMany
     {
-        return $this->belongsToMany(Household::class, 'household_users');
+        return $this->belongsToMany(Household::class, 'household_users')->using(HouseholdUser::class)->withTimestamps();
     }
 
     public function pushTokens(): HasMany

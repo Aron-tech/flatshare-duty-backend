@@ -2,7 +2,6 @@
 
 namespace App\Actions;
 
-use App\Enums\TaskUserWeightEnum;
 use App\Http\Requests\StoreTaskUserWeightRequest;
 use App\Models\Household;
 use App\Models\Task;
@@ -16,26 +15,27 @@ class StoreTaskUserWeightAction
 {
     use AsAction;
 
+    /**
+     * @param  array{weight: string}  $data
+     */
     public function handle(User $user, Household $household, Task $task, array $data): ?TaskUserWeight
     {
-        $exists_household_user = $user->households()->where('id', $household->id)->exists();
-        $weight = TaskUserWeightEnum::tryFrom($data['weight'])?->multiplier();
-        if (! ($exists_household_user && $weight)) {
+        $is_household_task = $task->household_id === $household->id;
+        $is_household_user = $user->households()->whereKey($household->id)->exists();
+        if (! ($is_household_task && $is_household_user)) {
             return null;
         }
 
-        return DB::transaction(function () use ($user, $household, $task, $weight) {
-            return TaskUserWeight::updateOrCreate(
-                [
-                    'household_id' => $household->id,
-                    'user_id' => $user->id,
-                    'task_id' => $task->id,
-                ],
-                [
-                    'weight' => $weight,
-                ]
-            );
-        });
+        return DB::transaction(fn () => TaskUserWeight::updateOrCreate(
+            [
+                'household_id' => $household->id,
+                'user_id' => $user->id,
+                'task_id' => $task->id,
+            ],
+            [
+                'weight' => $data['weight'],
+            ]
+        ));
     }
 
     public function asController(StoreTaskUserWeightRequest $request, Household $household, Task $task): JsonResponse

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Concerns\LogsModelActivity;
 use App\Enums\TaskInstanceStatusEnum;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property ?int $points Calculated for the current user, see CalculateTaskPointsAction.
@@ -14,6 +16,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['task_id', 'household_id', 'status', 'due_at', 'completed_at'])]
 class TaskInstance extends Model
 {
+    use LogsModelActivity;
+    use SoftDeletes;
+
     protected function casts(): array
     {
         return [
@@ -23,9 +28,12 @@ class TaskInstance extends Model
         ];
     }
 
+    /**
+     * Includes the deleted task, so the history of its completed instances stays readable.
+     */
     public function task(): BelongsTo
     {
-        return $this->belongsTo(Task::class);
+        return $this->belongsTo(Task::class)->withTrashed();
     }
 
     public function household(): BelongsTo
