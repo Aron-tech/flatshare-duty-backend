@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('workos_id')->unique();
             $table->string('first_name');
             $table->string('last_name');
+            $table->string('nickname')->nullable();
             $table->string('email')->unique();
             $table->string('avatar');
             $table->string('language', 6)->default(LanguageEnum::HUNGARIAN->value);
