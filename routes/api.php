@@ -28,6 +28,7 @@ Route::post('/auth/workos', AuthenticateWorkOsUserAction::class);
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('user/me', [UserController::class, 'me']);
+    Route::put('user/me', [UserController::class, 'update']);
 
     Route::prefix('push-tokens')->group(function () {
         Route::post('/', StorePushTokenAction::class);
