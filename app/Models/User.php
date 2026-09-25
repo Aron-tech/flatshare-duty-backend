@@ -31,7 +31,7 @@ class User extends Authenticatable
 
     public function getFullName(): string
     {
-        return LanguageEnum::from($this->language) === LanguageEnum::HUNGARIAN ? "{$this->last_name} {$this->first_name}" : "{$this->first_name} {$this->last_name}";
+        return $this->language === LanguageEnum::HUNGARIAN ? "{$this->last_name} {$this->first_name}" : "{$this->first_name} {$this->last_name}";
     }
 
     public function households(): BelongsToMany
