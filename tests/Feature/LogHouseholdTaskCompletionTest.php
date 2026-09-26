@@ -79,13 +79,26 @@ it('logs a non-recurring task as a new completed task instance and credits the p
         ->and($transaction->task_instance_id)->toBe($logged->id);
 });
 
+it('does not log the same task twice within a few minutes', function () {
+    $task = logTask($this->household);
+    $url = "/api/households/{$this->household->id}/tasks/{$task->id}/log";
+
+    $this->postJson($url)->assertOk();
+    $this->postJson($url)->assertForbidden()->assertJsonPath('message', __('app.task_just_logged'));
+
+    $this->travel(6)->minutes();
+    $this->postJson($url)->assertOk();
+
+    expect(PointTransaction::count())->toBe(2);
+});
+
 it('does not log a recurring task or a task of another household', function () {
     $recurring = logTask($this->household, ['is_recurring' => true, 'recurrence_interval' => 1, 'recurrence_unit' => 'week']);
     $other_household = Household::create(['name' => 'Other', 'join_code' => '0000000002', 'created_by' => $this->user->id]);
     $foreign = logTask($other_household);
 
     $this->postJson("/api/households/{$this->household->id}/tasks/{$recurring->id}/log")->assertForbidden();
-    $this->postJson("/api/households/{$this->household->id}/tasks/{$foreign->id}/log")->assertForbidden();
+    $this->postJson("/api/households/{$this->household->id}/tasks/{$foreign->id}/log")->assertNotFound();
 
     expect(PointTransaction::count())->toBe(0);
 });

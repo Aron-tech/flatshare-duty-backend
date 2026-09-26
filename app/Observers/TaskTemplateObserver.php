@@ -10,4 +10,14 @@ class TaskTemplateObserver
     {
         $task_template->calculateBasePoints();
     }
+
+    public function saved(TaskTemplate $task_template): void
+    {
+        TaskTemplate::invalidateCache();
+    }
+
+    public function deleted(TaskTemplate $task_template): void
+    {
+        TaskTemplate::invalidateCache();
+    }
 }

@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\LanguageEnum;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rule;
 
 class WorkOsLoginRequest extends FormRequest
 {
@@ -17,8 +17,8 @@ class WorkOsLoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'code'     => ['required', 'string'],
-            'language' => [new Enum(LanguageEnum::class)],
+            'code' => ['required', 'string'],
+            'language' => [Rule::enum(LanguageEnum::class)],
         ];
     }
 }

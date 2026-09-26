@@ -3,7 +3,7 @@
 namespace App\Concerns;
 
 use App\Enums\TaskAssignmentModeEnum;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 trait ValidatesTaskAssignment
@@ -14,7 +14,7 @@ trait ValidatesTaskAssignment
     protected function assignmentRules(): array
     {
         return [
-            'assignment_mode' => ['nullable', new Enum(TaskAssignmentModeEnum::class)],
+            'assignment_mode' => ['nullable', Rule::enum(TaskAssignmentModeEnum::class)],
             'fixed_user_id' => ['nullable', 'required_if:assignment_mode,fixed', 'int', 'exists:users,id'],
             'rotation_user_ids' => ['nullable', 'array'],
             'rotation_user_ids.*' => ['int', 'distinct', 'exists:users,id'],

@@ -3,6 +3,7 @@
 namespace App\Actions\TaskWeightNotification;
 
 use App\Actions\PushToken\SendPushNotificationAction;
+use App\Concerns\WritesCommandOutput;
 use App\Models\Household;
 use App\Models\Task;
 use App\Models\TaskWeightNotification;
@@ -16,8 +17,9 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class NotifyUnweightedTasksAction
 {
     use AsAction;
+    use WritesCommandOutput;
 
-    public string $commandSignature = 'tasks:notify-unweighted';
+    public string $commandSignature = 'tasks:notify-unweighted {--output : Eredmény kiírása a konzolra}';
 
     public string $commandDescription = 'Push értesítés a tagoknak a még nem súlyozott feladatokról (feladatonként egyszer).';
 
@@ -93,6 +95,6 @@ class NotifyUnweightedTasksAction
 
     public function asCommand(Command $command): void
     {
-        $command->info("Értesítések: {$this->handle()}");
+        $this->writeOutput($command, "Értesítések: {$this->handle()}");
     }
 }

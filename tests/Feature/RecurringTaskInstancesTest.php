@@ -1,10 +1,14 @@
 <?php
 
 use App\Actions\RecurringTask\GenerateRecurringTaskInstancesAction;
+use App\Actions\RecurringTask\ReleaseOverdueTaskClaimsAction;
+use App\Enums\PointTransactionType;
 use App\Enums\RoleEnum;
 use App\Enums\TaskInstanceStatusEnum;
 use App\Models\Household;
+use App\Models\PointTransaction;
 use App\Models\Task;
+use App\Models\TaskInstanceUser;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +44,11 @@ function recurringTask(Household $household, array $attributes = []): Task
     ]);
 }
 
+function completeLatestInstance(Task $task): void
+{
+    $task->taskInstances()->latest('id')->first()->update(['status' => TaskInstanceStatusEnum::ACCEPTED, 'completed_at' => now()]);
+}
+
 beforeEach(function () {
     $this->user = recurringUser();
     $this->other = recurringUser();
@@ -54,15 +63,66 @@ it('does not create an instance before the period has elapsed', function () {
     expect(GenerateRecurringTaskInstancesAction::make()->handle())->toBe(0);
 });
 
-it('creates the next instance after the period and expires the open one', function () {
+it('gives the first instance of a recurring task a due date', function () {
+    $this->freezeSecond();
     $task = recurringTask($this->household);
+
+    expect($task->taskInstances()->sole()->due_at->equalTo(now()->addDay()))->toBeTrue();
+});
+
+it('creates the next instance after the period when the previous one is done', function () {
+    $task = recurringTask($this->household);
+    completeLatestInstance($task);
 
     $this->travel(25)->hours();
 
     expect(GenerateRecurringTaskInstancesAction::make()->handle())->toBe(1);
     expect($task->taskInstances()->count())->toBe(2);
-    expect($task->taskInstances()->oldest('id')->first()->status)->toBe(TaskInstanceStatusEnum::EXPIRED);
     expect($task->taskInstances()->latest('id')->first()->due_at)->not->toBeNull();
+});
+
+it('carries over an overdue open instance instead of creating a new one', function () {
+    $task = recurringTask($this->household);
+
+    $this->travel(3)->days();
+
+    expect(GenerateRecurringTaskInstancesAction::make()->handle())->toBe(0);
+    expect($task->taskInstances()->sole()->status)->toBe(TaskInstanceStatusEnum::PENDING);
+});
+
+it('releases the claims not completed by the due date and records them as missed', function () {
+    $task = recurringTask($this->household);
+    $instance = $task->taskInstances()->sole();
+    $missed = $instance->taskInstanceUsers()->create(['user_id' => $this->user->id]);
+
+    $this->travel(2)->days();
+    $rescue = $instance->taskInstanceUsers()->create(['user_id' => $this->other->id]);
+
+    expect(ReleaseOverdueTaskClaimsAction::make()->handle())->toBe(1)
+        ->and(TaskInstanceUser::withTrashed()->find($missed->id)->trashed())->toBeTrue()
+        ->and($rescue->fresh()->trashed())->toBeFalse()
+        ->and(PointTransaction::sole()->type)->toBe(PointTransactionType::MISSED_TASK_PENALTY)
+        ->and(PointTransaction::sole()->amount)->toBe(0);
+});
+
+it('lets anyone claim a released task and shows the bounty only to the ones who did not miss it', function () {
+    $task = recurringTask($this->household);
+    $instance = $task->taskInstances()->sole();
+    $instance->taskInstanceUsers()->create(['user_id' => $this->user->id]);
+
+    $this->travel(3)->days();
+    ReleaseOverdueTaskClaimsAction::make()->handle();
+
+    Sanctum::actingAs($this->other);
+    $this->getJson("/api/households/{$this->household->id}/task-instances")
+        ->assertJsonPath('available.0.id', $instance->id)
+        ->assertJsonPath('available.0.points', 11);
+
+    Sanctum::actingAs($this->user);
+    $this->getJson("/api/households/{$this->household->id}/task-instances")
+        ->assertJsonPath('available.0.points', 10);
+    $this->postJson("/api/households/{$this->household->id}/task-instances/{$instance->id}/claim")->assertOk();
+    $this->postJson("/api/households/{$this->household->id}/task-instances/{$instance->id}/complete")->assertJsonPath('points', 10);
 });
 
 it('ignores non-recurring tasks', function () {
@@ -75,6 +135,7 @@ it('ignores non-recurring tasks', function () {
 
 it('assigns the fixed member to every generated instance', function () {
     $task = recurringTask($this->household, ['assignment_mode' => 'fixed', 'fixed_user_id' => $this->other->id]);
+    completeLatestInstance($task);
 
     $this->travel(25)->hours();
     GenerateRecurringTaskInstancesAction::make()->handle();
@@ -92,6 +153,7 @@ it('rotates the assignee between the members', function () {
 
     $assignees = [];
     foreach (range(1, 3) as $ignored) {
+        completeLatestInstance($task);
         $this->travel(25)->hours();
         GenerateRecurringTaskInstancesAction::make()->handle();
         $assignees[] = $task->taskInstances()->latest('id')->first()->taskInstanceUsers()->value('user_id');
@@ -102,6 +164,7 @@ it('rotates the assignee between the members', function () {
 
 it('leaves the generated instance unassigned without an assignment', function () {
     $task = recurringTask($this->household);
+    completeLatestInstance($task);
 
     $this->travel(25)->hours();
     GenerateRecurringTaskInstancesAction::make()->handle();

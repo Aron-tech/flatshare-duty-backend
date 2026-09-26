@@ -1,12 +1,16 @@
 <?php
 
+use App\Enums\PointTransactionType;
 use App\Enums\RoleEnum;
 use App\Enums\TaskInstanceStatusEnum;
 use App\Models\Household;
+use App\Models\PointTransaction;
 use App\Models\Task;
 use App\Models\TaskInstance;
 use App\Models\TaskUserWeight;
 use App\Models\User;
+use App\Models\WeeklyPointGoal;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
@@ -59,7 +63,7 @@ function weighTask(TaskInstance $instance, User $user): void
 }
 
 beforeEach(function () {
-    $this->travelTo(now()->startOfWeek());
+    $this->travelTo(WeeklyPointGoal::weekStartsAt());
     $this->user = dashboardUser();
     $this->household = Household::create(['name' => 'Home', 'join_code' => '0000000001', 'created_by' => $this->user->id]);
     $this->household->users()->attach($this->user->id, ['role' => RoleEnum::USER, 'points_balance' => 42]);
@@ -102,12 +106,78 @@ it('splits task instances into available and claimed', function () {
         ->and(collect($response->json('claimed'))->pluck('id')->all())->toBe([$claimed->id]);
 });
 
-it('does not let a task instance be claimed before the user weighed the task', function () {
+it('shows the share of the points the user would get with the current claimers', function () {
+    $joinable = dashboardInstance($this->household, $this->user, 2);
+    $joinable->taskInstanceUsers()->create(['user_id' => dashboardUser()->id]);
+
+    $shared = dashboardInstance($this->household, $this->user, 2);
+    $shared->taskInstanceUsers()->create(['user_id' => $this->user->id]);
+    $shared->taskInstanceUsers()->create(['user_id' => dashboardUser()->id]);
+
+    $response = $this->getJson("/api/households/{$this->household->id}/task-instances")->assertOk();
+
+    expect($response->json('available.0.points'))->toBe(5)
+        ->and($response->json('available.0.claimers'))->toBe(2)
+        ->and($response->json('claimed.0.points'))->toBe(5);
+});
+
+it('lets a member claim a task instance without weighting the task', function () {
     $instance = dashboardInstance($this->household, $this->user);
 
-    $this->postJson("/api/households/{$this->household->id}/task-instances/{$instance->id}/claim")->assertForbidden();
+    $this->postJson("/api/households/{$this->household->id}/task-instances/{$instance->id}/claim")->assertOk();
 
-    expect($instance->taskInstanceUsers()->count())->toBe(0);
+    expect($instance->taskInstanceUsers()->count())->toBe(1);
+});
+
+it('returns the weekly points and holds back the ones covering the minimum from the spendable points', function () {
+    Task::withoutEvents(fn () => Task::create([
+        'household_id' => $this->household->id,
+        'created_by' => $this->user->id,
+        'name' => 'Weekly',
+        'duration_minutes' => 30,
+        'difficulty' => 'easy',
+        'base_points' => 30,
+        'is_recurring' => true,
+        'recurrence_interval' => 1,
+        'recurrence_unit' => 'week',
+    ]));
+    PointTransaction::create([
+        'household_id' => $this->household->id,
+        'user_id' => $this->user->id,
+        'amount' => 20,
+        'balance_after' => 42,
+        'type' => PointTransactionType::TASK_COMPLETION,
+    ]);
+
+    $this->getJson("/api/households/{$this->household->id}/me")
+        ->assertOk()
+        ->assertJsonPath('min_points', 30)
+        ->assertJsonPath('weekly_points', 20)
+        ->assertJsonPath('spendable_points', 22);
+});
+
+it('starts the week on Monday midnight in the week timezone', function () {
+    expect(WeeklyPointGoal::weekStartsAt(CarbonImmutable::parse('2026-09-28 00:30', 'Europe/Budapest'))->toIso8601String())
+        ->toBe('2026-09-27T22:00:00+00:00')
+        ->and(WeeklyPointGoal::weekDate(CarbonImmutable::parse('2026-09-27 22:00', 'UTC')))->toBe('2026-09-28')
+        ->and(WeeklyPointGoal::weekEndsAt(CarbonImmutable::parse('2026-10-19 00:00', 'Europe/Budapest'))->toIso8601String())
+        ->toBe('2026-10-25T23:00:00+00:00');
+});
+
+it('counts a completion after Monday midnight in the week timezone to the new week', function () {
+    $this->travelTo(WeeklyPointGoal::weekStartsAt()->addMinutes(30));
+    foreach ([now()->subHour(), now()] as $created_at) {
+        $transaction = PointTransaction::create([
+            'household_id' => $this->household->id,
+            'user_id' => $this->user->id,
+            'amount' => 10,
+            'balance_after' => 42,
+            'type' => PointTransactionType::TASK_COMPLETION,
+        ]);
+        $transaction->forceFill(['created_at' => $created_at])->save();
+    }
+
+    $this->getJson("/api/households/{$this->household->id}/me")->assertOk()->assertJsonPath('weekly_points', 10);
 });
 
 it('claims a task instance only once', function () {

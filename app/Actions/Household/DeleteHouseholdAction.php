@@ -3,41 +3,27 @@
 namespace App\Actions\Household;
 
 use App\Models\Household;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('delete', 'household')]
 class DeleteHouseholdAction
 {
     use AsAction;
 
-    /**
-     * @throws AuthorizationException
-     */
-    public function handle(User $user, Household $household): bool
+    public function handle(Household $household): bool
     {
-        if ($user->id !== $household->created_by) {
-            return false;
-        }
-
-        return DB::transaction(fn () => $household->delete());
+        return DB::transaction(fn (): bool => (bool) $household->delete());
     }
 
-    public function asController(Request $request, Household $household): JsonResponse
+    /**
+     * @return array{message: string}
+     */
+    public function asController(Household $household): array
     {
-        try {
-            if (! $this->handle($request->user(), $household)) {
-                return response()->json(['message' => __('app.no_permission')], 403);
-            }
+        $this->handle($household);
 
-            return response()->json(['message' => __('app.success_action')]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['message' => __('app.success_action')];
     }
 }

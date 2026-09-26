@@ -6,6 +6,8 @@ use App\Enums\TaskAssignmentModeEnum;
 use App\Models\Task;
 use App\Models\TaskInstance;
 use App\Models\TaskInstanceUser;
+use App\Models\TaskUserRotation;
+use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class AssignTaskInstanceAction
@@ -25,13 +27,14 @@ class AssignTaskInstanceAction
             return null;
         }
 
+        $member_ids = $task->household->householdUsers()->pluck('user_id');
         $user_id = match ($task->assignment_mode) {
             TaskAssignmentModeEnum::FIXED => $task->fixed_user_id,
-            TaskAssignmentModeEnum::ROTATING => $this->nextRotationUserId($task),
+            TaskAssignmentModeEnum::ROTATING => $this->nextRotationUserId($task, $member_ids),
             default => null,
         };
 
-        if (! $user_id || ! $task->household->householdUsers()->where('user_id', $user_id)->exists()) {
+        if (! $user_id || ! $member_ids->contains($user_id)) {
             return null;
         }
 
@@ -42,16 +45,18 @@ class AssignTaskInstanceAction
         return $task_instance->taskInstanceUsers()->create(['user_id' => $user_id]);
     }
 
-    private function nextRotationUserId(Task $task): ?int
+    /**
+     * @param  Collection<int, int>  $member_ids
+     */
+    private function nextRotationUserId(Task $task, Collection $member_ids): ?int
     {
-        $member_ids = $task->household->householdUsers()->pluck('user_id');
-        $rotation = $task->rotations()->get()->filter(fn ($rotation) => $member_ids->contains($rotation->user_id))->values();
+        $rotation = $task->rotations()->whereIn('user_id', $member_ids)->get();
 
         if ($rotation->isEmpty()) {
             return null;
         }
 
-        $last_index = $rotation->search(fn ($rotation) => $rotation->user_id === $task->last_assigned_user_id);
+        $last_index = $rotation->search(fn (TaskUserRotation $rotation): bool => $rotation->user_id === $task->last_assigned_user_id);
 
         return $rotation[$last_index === false ? 0 : ($last_index + 1) % $rotation->count()]->user_id;
     }

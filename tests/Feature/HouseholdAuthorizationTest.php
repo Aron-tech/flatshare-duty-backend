@@ -80,7 +80,7 @@ it('registers the scheduled recurring task generation command', function () {
         'recurrence_interval' => 1,
         'recurrence_unit' => 'day',
     ]);
-    $task->taskInstances()->update(['created_at' => now()->subDays(2)]);
+    $task->taskInstances()->update(['created_at' => now()->subDays(2), 'status' => 'accepted', 'completed_at' => now()->subDay()]);
 
     expect(Artisan::call('tasks:generate-instances'))->toBe(0)
         ->and($task->taskInstances()->count())->toBe(2);

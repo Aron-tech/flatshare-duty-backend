@@ -3,47 +3,31 @@
 namespace App\Actions\Household;
 
 use App\Models\Household;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Lorisleiva\Actions\Concerns\AsAction;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
+/**
+ * The QR code contains the join code, so only the members of the household can get it.
+ */
+#[Authorize('view', 'household')]
 class GenerateHouseholdQrCodeAction
 {
     use AsAction;
 
     /**
-     * The QR code contains the join code, so only the members of the household can get it.
-     *
-     * @throws AuthorizationException
+     * @return string the QR code of the join deep link as SVG
      */
-    public function handle(User $user, Household $household): string
+    public function handle(Household $household): string
     {
-        if (! $user->households()->whereKey($household->id)->exists()) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        $deep_link = "flatshare://join?code={$household->join_code}";
-
         return QrCode::size(250)
             ->errorCorrection('H')
-            ->generate($deep_link);
+            ->generate("flatshare://join?code={$household->join_code}");
     }
 
-    public function asController(Request $request, Household $household): Response
+    public function asController(Household $household): Response
     {
-        try {
-            $svg = $this->handle($request->user(), $household);
-
-            return response($svg)->header('Content-Type', 'image/svg+xml');
-        } catch (AuthorizationException $e) {
-            return response(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response(['message' => __('app.failed_action')], 500);
-        }
+        return response($this->handle($household), Response::HTTP_OK, ['Content-Type' => 'image/svg+xml']);
     }
 }

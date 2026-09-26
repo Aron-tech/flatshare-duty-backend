@@ -5,28 +5,30 @@ namespace App\Actions\HouseholdTask;
 use App\Actions\RecurringTask\SyncTaskAssignmentAction;
 use App\Http\Requests\StoreHouseholdTaskRequest;
 use App\Models\Household;
-use App\Models\HouseholdUser;
 use App\Models\Task;
 use App\Models\User;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Container\Attributes\CurrentUser;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+/**
+ * Any member can add a task to the household.
+ */
+#[Authorize('view', 'household')]
 class StoreHouseholdTaskAction
 {
     use AsAction;
 
-    public function handle(User $user, Household $household, array $data): ?Task
+    /**
+     * @param  array<string, mixed>  $data  see StoreHouseholdTaskRequest
+     */
+    public function handle(User $user, Household $household, array $data): Task
     {
-        $household_user = HouseholdUser::query()->where('user_id', $user->id)->where('household_id', $household->id)->first();
-        if (! $household_user) {
-            return $household_user;
-        }
-
-        return DB::transaction(function () use ($household, $user, $data) {
+        return DB::transaction(function () use ($household, $user, $data): Task {
             $task = $household->tasks()->create([
-                ...Arr::except($data, ['assignment_mode', 'fixed_user_id', 'rotation_user_ids']),
+                ...Arr::except($data, SyncTaskAssignmentAction::ATTRIBUTES),
                 'created_by' => $user->id,
             ]);
 
@@ -34,18 +36,13 @@ class StoreHouseholdTaskAction
         });
     }
 
-    public function asController(StoreHouseholdTaskRequest $request, Household $household): JsonResponse
+    /**
+     * @return array{household: Household, message: string}
+     */
+    public function asController(StoreHouseholdTaskRequest $request, #[CurrentUser] User $user, Household $household): array
     {
-        try {
-            if (! $this->handle($request->user(), $household, $request->validated())) {
-                return response()->json(['message' => __('app.no_permission')], 403);
-            }
+        $this->handle($user, $household, $request->validated());
 
-            return response()->json(['household' => $household, 'message' => __('app.success_action')]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['household' => $household, 'message' => __('app.success_action')];
     }
 }

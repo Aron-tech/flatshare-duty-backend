@@ -4,42 +4,30 @@ namespace App\Actions\Household;
 
 use App\Http\Requests\RenameHouseholdRequest;
 use App\Models\Household;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('update', 'household')]
 class RenameHouseholdAction
 {
     use AsAction;
 
     /**
-     * @throws AuthorizationException
+     * @param  array{name: string}  $data
      */
-    public function handle(User $user, Household $household, array $data): Household
+    public function handle(Household $household, array $data): Household
     {
-        if (! $user->isAdminOf($household)) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        DB::transaction(fn () => $household->update($data));
+        DB::transaction(fn (): bool => $household->update($data));
 
         return $household;
     }
 
-    public function asController(RenameHouseholdRequest $request, Household $household): JsonResponse
+    /**
+     * @return array{household: Household, message: string}
+     */
+    public function asController(RenameHouseholdRequest $request, Household $household): array
     {
-        try {
-            $household = $this->handle($request->user(), $household, $request->validated());
-
-            return response()->json(['household' => $household, 'message' => __('app.success_action')]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['household' => $this->handle($household, $request->validated()), 'message' => __('app.success_action')];
     }
 }

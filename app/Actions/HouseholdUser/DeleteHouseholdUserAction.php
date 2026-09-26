@@ -4,48 +4,36 @@ namespace App\Actions\HouseholdUser;
 
 use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Models\HouseholdUser;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+/**
+ * A member can remove themselves, anyone else can only be removed by an admin of the household, see HouseholdUserPolicy.
+ */
+#[Authorize('delete', 'household_user')]
 class DeleteHouseholdUserAction
 {
     use AsAction;
 
     /**
-     * A member can remove themselves, anyone else can only be removed by an admin of the household.
+     * The member's claims and assignments are released, their rewards deleted and the admins asked about their tasks, see HouseholdUserObserver.
      */
-    public function handle(User $user, HouseholdUser $household_user): bool
+    public function handle(HouseholdUser $household_user): bool
     {
-        $is_self = $household_user->user_id === $user->id;
-
-        if (! $is_self && ! $user->isAdminOf($household_user->household_id)) {
-            return false;
-        }
-
-        $is_deleted = DB::transaction(fn () => $household_user->delete());
+        $is_deleted = DB::transaction(fn (): bool => (bool) $household_user->delete());
         RecalculateWeeklyPointGoalsAction::run($household_user->household);
 
         return $is_deleted;
     }
 
-    public function asController(Request $request, HouseholdUser $household_user): JsonResponse
+    /**
+     * @return array{message: string}
+     */
+    public function asController(HouseholdUser $household_user): array
     {
-        try {
-            if (! $this->handle($request->user(), $household_user)) {
-                return response()->json(['message' => __('app.no_permission')], 403);
-            }
+        $this->handle($household_user);
 
-            return response()->json(['message' => __('app.success_action')]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['message' => __('app.success_action')];
     }
 }

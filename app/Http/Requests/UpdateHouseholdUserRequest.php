@@ -3,10 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Enums\RoleEnum;
-use App\Models\HouseholdUser;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rule;
 
 class UpdateHouseholdUserRequest extends FormRequest
 {
@@ -18,7 +17,7 @@ class UpdateHouseholdUserRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => [new Enum(RoleEnum::class)],
+            'role' => [Rule::enum(RoleEnum::class)],
         ];
     }
 }

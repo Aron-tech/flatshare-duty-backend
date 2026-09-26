@@ -17,7 +17,10 @@ class HouseholdObserver
         }
     }
 
-    public function deleting(Household $household): void
+    /**
+     * The members are removed after the household is trashed, so HouseholdUserObserver does not treat it as members leaving.
+     */
+    public function deleted(Household $household): void
     {
         $household->users()->detach();
     }

@@ -175,14 +175,14 @@ it('does not store a weight for another household task', function () {
     $task = householdTask($other_household);
 
     $this->postJson("/api/households/{$this->household->id}/tasks/{$task->id}/user-weight", ['weight' => 'love'])
-        ->assertForbidden();
+        ->assertNotFound();
 });
 
 it('deletes a task of the household only', function () {
     $task = householdTask($this->household);
     $other_task = householdTask(Household::create(['name' => 'Other', 'join_code' => '0000000002', 'created_by' => $this->user->id]));
 
-    $this->deleteJson("/api/households/{$this->household->id}/tasks/{$other_task->id}")->assertForbidden();
+    $this->deleteJson("/api/households/{$this->household->id}/tasks/{$other_task->id}")->assertNotFound();
     $this->deleteJson("/api/households/{$this->household->id}/tasks/{$task->id}")->assertOk();
 
     expect(Task::pluck('id')->all())->toBe([$other_task->id]);
@@ -218,7 +218,7 @@ it('returns the validation errors per field', function () {
         ->assertJsonValidationErrors(['name', 'duration_minutes', 'difficulty', 'max_user']);
 });
 
-it('lists the household tasks for any member with the own weight', function () {
+it('lists the household tasks for any member with the own weight and the common price', function () {
     $task = householdTask($this->household);
     $member = householdTaskUser();
     $this->household->users()->attach($member->id, ['role' => RoleEnum::CHILD]);
@@ -227,7 +227,8 @@ it('lists the household tasks for any member with the own weight', function () {
 
     $this->getJson("/api/households/{$this->household->id}/tasks")
         ->assertOk()
-        ->assertJsonCount(0, 'tasks.'.__('app.other').'.0.user_weights');
+        ->assertJsonCount(0, 'tasks.'.__('app.other').'.0.user_weights')
+        ->assertJsonPath('tasks.'.__('app.other').'.0.points', 9);
 
     Sanctum::actingAs(householdTaskUser());
     $this->getJson("/api/households/{$this->household->id}/tasks")->assertForbidden();
@@ -279,7 +280,7 @@ it('rejects renaming a task to an existing name but keeps its own', function () 
 
 it('does not let a child or another household update a task', function () {
     $other_task = householdTask(Household::create(['name' => 'Other', 'join_code' => '0000000002', 'created_by' => $this->user->id]));
-    $this->putJson("/api/households/{$this->household->id}/tasks/{$other_task->id}", ['name' => 'Vacuum'])->assertForbidden();
+    $this->putJson("/api/households/{$this->household->id}/tasks/{$other_task->id}", ['name' => 'Vacuum'])->assertNotFound();
 
     $task = householdTask($this->household);
     $child = householdTaskUser();

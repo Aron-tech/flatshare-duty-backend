@@ -2,84 +2,80 @@
 
 namespace App\Actions;
 
+use App\Actions\TaskOffer\SettleTaskOfferAction;
+use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Enums\PointTransactionType;
 use App\Enums\TaskInstanceStatusEnum;
-use App\Enums\TaskUserWeightEnum;
+use App\Enums\TaskOfferStatusEnum;
 use App\Models\Household;
 use App\Models\HouseholdUser;
 use App\Models\PointTransaction;
 use App\Models\TaskInstance;
+use App\Models\TaskInstanceUser;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Container\Attributes\CurrentUser;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class CompleteTaskInstanceAction
 {
     use AsAction;
 
     /**
-     * Completes the user's claim on the task instance and credits the earned points.
-     * The solo bonus applies when a multi-user task is done by its only claimer.
-     * A penalty task assigned for missing the weekly minimum points earns no points.
+     * Completes the user's claim on the task instance and credits the earned points, the task's points shared between its claimers.
+     * A penalty task assigned for missing the weekly minimum points only earns the points above the shortfall it covers.
+     * A task taken over through an offer also pays out the offered points (DELEGATION_PAYOUT), and the user's own open offer
+     * of the task is withdrawn with a refund, see SettleTaskOfferAction.
      * The task instance itself is closed once every claimer has completed their part.
      *
      * @throws AuthorizationException
      */
     public function handle(User $user, Household $household, TaskInstance $task_instance): PointTransaction
     {
-        if ($task_instance->household_id !== $household->id) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
+        $household_user = GetHouseholdUserAction::run($user, $household);
 
-        $household_user = $household->householdUsers()->where('user_id', $user->id)->first();
-        if (! $household_user) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        return DB::transaction(function () use ($user, $household_user, $task_instance) {
+        return DB::transaction(function () use ($user, $household_user, $task_instance): PointTransaction {
             $task_instance = TaskInstance::query()->with('task')->lockForUpdate()->findOrFail($task_instance->id);
             $claims = $task_instance->taskInstanceUsers()->lockForUpdate()->get();
             $claim = $claims->firstWhere('user_id', $user->id);
 
-            $is_open = $task_instance->status === TaskInstanceStatusEnum::PENDING && ! $task_instance->completed_at;
-            if (! $is_open || ! $claim || $claim->completed_at) {
+            if (! $task_instance->isOpen() || ! $claim || $claim->completed_at) {
                 throw new AuthorizationException(__('app.task_instance_not_completable'));
             }
 
             $claim->update(['completed_at' => now()]);
 
-            if ($claims->every(fn ($task_instance_user) => $task_instance_user->completed_at)) {
+            if ($claims->every(fn (TaskInstanceUser $task_instance_user): bool => (bool) $task_instance_user->completed_at)) {
                 $task_instance->update(['status' => TaskInstanceStatusEnum::ACCEPTED, 'completed_at' => now()]);
             }
 
-            if ($claim->weekly_point_goal_id) {
-                return $this->creditPoints($household_user, $task_instance, 0, PointTransactionType::PENALTY_TASK_COMPLETION);
-            }
-
-            $is_solo = $task_instance->task->max_user > 1 && $claims->count() === 1;
-
-            return $this->creditPoints($household_user, $task_instance, $this->calculatePoints($task_instance, $user, $is_solo), PointTransactionType::TASK_COMPLETION);
-        });
-    }
-
-    /**
-     * Falls back to the neutral weight when the user has not weighted the task yet.
-     */
-    private function calculatePoints(TaskInstance $task_instance, User $user, bool $is_solo): int
-    {
-        $calculate_task_points = CalculateTaskPointsAction::make();
-
-        return $calculate_task_points->handle($task_instance, $user, $is_solo)
-            ?? $calculate_task_points->calculate(
-                $task_instance->task->base_points,
-                TaskUserWeightEnum::NEUTRAL,
-                $task_instance->task->getData('frequency', 0),
-                $task_instance->due_at,
-                $is_solo,
+            $calculate_task_points = CalculateTaskPointsAction::make();
+            $points = $calculate_task_points->handle(
+                $task_instance,
+                with_bounty: $calculate_task_points->isBountyEligible($task_instance, $user),
+                claimers: $claims->count(),
+                claimed_at: $claim->created_at,
             );
+
+            $point_transaction = $this->creditPoints(
+                $household_user,
+                $task_instance,
+                $claim->payablePoints($points),
+                $claim->isPenalty() ? PointTransactionType::PENALTY_TASK_COMPLETION : PointTransactionType::TASK_COMPLETION,
+            );
+
+            if ($claim->taskOffer) {
+                SettleTaskOfferAction::run($claim->taskOffer, TaskOfferStatusEnum::COMPLETED);
+            }
+            $claim->offers()->where('status', TaskOfferStatusEnum::OPEN)->each(
+                fn ($task_offer) => SettleTaskOfferAction::run($task_offer, TaskOfferStatusEnum::CANCELLED, from: [TaskOfferStatusEnum::OPEN]),
+            );
+
+            return $point_transaction;
+        });
     }
 
     private function creditPoints(HouseholdUser $household_user, TaskInstance $task_instance, int $points, PointTransactionType $type): PointTransaction
@@ -97,22 +93,28 @@ class CompleteTaskInstanceAction
         ]);
     }
 
-    public function asController(Request $request, Household $household, TaskInstance $task_instance): JsonResponse
+    /**
+     * offer_points: the points paid out for a task taken over through an offer.
+     *
+     * @return array{points: int, offer_points: int, points_balance: int, weekly_points: int, spendable_points: int, message: string}
+     */
+    public function asController(#[CurrentUser] User $user, Household $household, TaskInstance $task_instance): array
     {
-        try {
-            $point_transaction = $this->handle($request->user(), $household, $task_instance);
+        $point_transaction = $this->handle($user, $household, $task_instance);
+        $household_user = GetHouseholdUserAction::run($user, $household);
+        RecalculateWeeklyPointGoalsAction::make()->currentGoals($household);
 
-            return response()->json([
-                'points' => $point_transaction->amount,
-                'points_balance' => $point_transaction->balance_after,
-                'message' => __('app.success_action'),
-            ]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return [
+            'points' => $point_transaction->amount,
+            'offer_points' => (int) PointTransaction::query()
+                ->where('user_id', $household_user->user_id)
+                ->where('task_instance_id', $task_instance->id)
+                ->where('type', PointTransactionType::DELEGATION_PAYOUT)
+                ->sum('amount'),
+            'points_balance' => $household_user->points_balance,
+            'weekly_points' => $household_user->weeklyPoints(),
+            'spendable_points' => $household_user->spendablePoints(),
+            'message' => __('app.success_action'),
+        ];
     }
 }

@@ -3,62 +3,44 @@
 namespace App\Actions\HouseholdTask;
 
 use App\Actions\CalculateTaskPointsAction;
-use App\Enums\TaskUserWeightEnum;
 use App\Models\Household;
 use App\Models\Task;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class ListOneOffHouseholdTasksAction
 {
     use AsAction;
 
     /**
      * Lists the non-recurring tasks of the household, which any member can log as done.
-     * The points fall back to the neutral weight when the user has not weighted the task yet.
+     * The points are the same for every member, see CalculateTaskPointsAction.
      *
      * @return Collection<int, Task>
-     *
-     * @throws AuthorizationException
      */
-    public function handle(User $user, Household $household): Collection
+    public function handle(Household $household): Collection
     {
-        if (! $user->households()->whereKey($household->id)->exists()) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        $tasks = $household->tasks()
-            ->where('is_recurring', false)
-            ->with([
-                'category',
-                'userWeights' => fn ($query) => $query->where('user_id', $user->id),
-            ])
-            ->orderBy('name')
-            ->get();
-
+        $member_ids = $household->householdUsers()->pluck('user_id');
         $calculate_task_points = CalculateTaskPointsAction::make();
 
-        return $tasks->each(fn (Task $task) => $task->setAttribute(
-            'points',
-            $calculate_task_points->handle($task, $user)
-                ?? $calculate_task_points->calculate($task->base_points, TaskUserWeightEnum::NEUTRAL, $task->getData('frequency', 0)),
-        ));
+        return $household->tasks()
+            ->oneOff()
+            ->with([
+                'category',
+                'userWeights' => fn ($query) => $query->whereIn('user_id', $member_ids),
+            ])
+            ->orderBy('name')
+            ->get()
+            ->each(fn (Task $task): Task => $task->setAttribute('points', $calculate_task_points->handle($task, $member_ids)));
     }
 
-    public function asController(Request $request, Household $household): JsonResponse
+    /**
+     * @return array{tasks: Collection<int, Task>}
+     */
+    public function asController(Household $household): array
     {
-        try {
-            return response()->json(['tasks' => $this->handle($request->user(), $household)]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['tasks' => $this->handle($household)];
     }
 }

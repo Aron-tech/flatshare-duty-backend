@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 
 class ExpoPushClient
 {
-    public const MAX_MESSAGES_PER_REQUEST = 100;
+    public const int MAX_MESSAGES_PER_REQUEST = 100;
 
     /**
      * @param  array<int, array<string, mixed>>  $messages  legfeljebb 100 elem

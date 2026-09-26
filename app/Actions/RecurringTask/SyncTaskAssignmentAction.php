@@ -3,13 +3,17 @@
 namespace App\Actions\RecurringTask;
 
 use App\Enums\TaskAssignmentModeEnum;
-use App\Enums\TaskInstanceStatusEnum;
 use App\Models\Task;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class SyncTaskAssignmentAction
 {
     use AsAction;
+
+    /**
+     * The request fields describing the assignment, they are not task attributes.
+     */
+    public const array ATTRIBUTES = ['assignment_mode', 'fixed_user_id', 'rotation_user_ids'];
 
     /**
      * Saves who a recurring task is assigned to: a fixed member, a rotation between members, or nobody.
@@ -45,8 +49,7 @@ class SyncTaskAssignmentAction
 
         if ($mode !== TaskAssignmentModeEnum::NONE) {
             $open_instance = $task->taskInstances()
-                ->where('status', TaskInstanceStatusEnum::PENDING)
-                ->whereNull('completed_at')
+                ->open()
                 ->latest('id')
                 ->first();
 
@@ -66,6 +69,6 @@ class SyncTaskAssignmentAction
         $user_ids = collect($user_ids ?: $task->household->householdUsers()->orderBy('id')->pluck('user_id'))->unique()->values();
 
         $task->rotations()->delete();
-        $user_ids->each(fn (int $user_id, int $order) => $task->rotations()->create(['user_id' => $user_id, 'rotation_order' => $order]));
+        $task->rotations()->createMany($user_ids->map(fn (int $user_id, int $order): array => ['user_id' => $user_id, 'rotation_order' => $order]));
     }
 }

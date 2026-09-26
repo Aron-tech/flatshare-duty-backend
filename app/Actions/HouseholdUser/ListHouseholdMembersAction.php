@@ -4,45 +4,33 @@ namespace App\Actions\HouseholdUser;
 
 use App\Models\Household;
 use App\Models\HouseholdUser;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class ListHouseholdMembersAction
 {
     use AsAction;
 
     /**
      * Lists the members of the household for any member, with the name only,
-     * so a task can be assigned to them. The full member list is admin only.
+     * so a task can be assigned to them. The full member list is admin only, see ListHouseholdUsersAction.
      *
      * @return Collection<int, array{user_id: int, name: string}>
-     *
-     * @throws AuthorizationException
      */
-    public function handle(User $user, Household $household): Collection
+    public function handle(Household $household): Collection
     {
-        if (! $user->households()->whereKey($household->id)->exists()) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
         return $household->householdUsers()->with('user')->orderBy('id')->get()
-            ->map(fn (HouseholdUser $household_user) => ['user_id' => $household_user->user_id, 'name' => $household_user->user->name]);
+            ->map(fn (HouseholdUser $household_user): array => ['user_id' => $household_user->user_id, 'name' => $household_user->user->name])
+            ->values();
     }
 
-    public function asController(Request $request, Household $household): JsonResponse
+    /**
+     * @return array{members: Collection<int, array{user_id: int, name: string}>}
+     */
+    public function asController(Household $household): array
     {
-        try {
-            return response()->json(['members' => $this->handle($request->user(), $household)->values()]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['members' => $this->handle($household)];
     }
 }

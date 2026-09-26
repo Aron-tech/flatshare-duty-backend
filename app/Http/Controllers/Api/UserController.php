@@ -4,28 +4,30 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateUserRequest;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use App\Models\User;
+use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Support\Facades\DB;
 
 class UserController extends Controller
 {
-    public function me(Request $request): JsonResponse
+    /**
+     * @return array{user: User}
+     */
+    public function me(#[CurrentUser] User $user): array
     {
-        return response()->json([
-            'user' => $request->user(),
-        ]);
+        return ['user' => $user];
     }
 
-    public function update(UpdateUserRequest $request): JsonResponse
+    /**
+     * @return array{user: User, message: string}
+     */
+    public function update(UpdateUserRequest $request, #[CurrentUser] User $user): array
     {
-        $user = $request->user();
-
-        DB::transaction(fn () => $user->update($request->validated()));
+        DB::transaction(fn (): bool => $user->update($request->validated()));
 
         // A nyelvváltás után a válasz már az új nyelven jöjjön.
         app()->setLocale($user->language->value);
 
-        return response()->json(['user' => $user, 'message' => __('app.success_action')]);
+        return ['user' => $user, 'message' => __('app.success_action')];
     }
 }

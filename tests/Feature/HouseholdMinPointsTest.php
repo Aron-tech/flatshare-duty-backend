@@ -58,6 +58,12 @@ it('splits the weekly pool of the tasks between the members', function () {
     expect($this->household->min_points)->toBe(85);
 });
 
+it('counts a task claimable by many members once, as the claimers share its points', function () {
+    minPointsTask($this->household, ['max_user' => 2]);
+
+    expect($this->household->min_points)->toBe(50);
+});
+
 it('averages the member weights and ignores non recurring tasks without an instance', function () {
     $task = minPointsTask($this->household);
     minPointsTask($this->household, ['is_recurring' => false, 'recurrence_unit' => null, 'recurrence_interval' => null]);

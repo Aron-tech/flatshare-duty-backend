@@ -4,42 +4,33 @@ namespace App\Actions\HouseholdUser;
 
 use App\Http\Requests\UpdateHouseholdUserRequest;
 use App\Models\HouseholdUser;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+/**
+ * A member can change their own membership, anyone else's only an admin of the household, see HouseholdUserPolicy.
+ */
+#[Authorize('update', 'household_user')]
 class UpdateHouseholdUserAction
 {
     use AsAction;
 
     /**
-     * @throws AuthorizationException
+     * @param  array{role?: string}  $data
      */
-    public function handle(User $user, HouseholdUser $household_user, array $data): HouseholdUser
+    public function handle(HouseholdUser $household_user, array $data): HouseholdUser
     {
-        if ($user->id !== $household_user->user_id && ! $user->isAdminOf($household_user->household_id)) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        DB::transaction(fn () => $household_user->update($data));
+        DB::transaction(fn (): bool => $household_user->update($data));
 
         return $household_user;
     }
 
-    public function asController(UpdateHouseholdUserRequest $request, HouseholdUser $household_user): JsonResponse
+    /**
+     * @return array{household_user: HouseholdUser, message: string}
+     */
+    public function asController(UpdateHouseholdUserRequest $request, HouseholdUser $household_user): array
     {
-        try {
-            $household_user = $this->handle($request->user(), $household_user, $request->validated());
-
-            return response()->json(['household_user' => $household_user, 'message' => __('app.success_action')]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['household_user' => $this->handle($household_user, $request->validated()), 'message' => __('app.success_action')];
     }
 }

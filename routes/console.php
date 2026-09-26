@@ -10,7 +10,10 @@ Artisan::command('inspire', function () {
 
 Schedule::command('tasks:notify-unweighted')->hourly()->withoutOverlapping();
 Schedule::command('rewards:release-stale-editing')->everyMinute()->withoutOverlapping();
-Schedule::command('points:remind-week')->weeklyOn(0, '16:00')->timezone('Europe/Budapest')->withoutOverlapping();
-Schedule::command('points:close-week')->weeklyOn(1, '00:05')->withoutOverlapping();
+Schedule::command('points:remind-week')->dailyAt('16:00')->timezone(config('app.week_timezone'))->withoutOverlapping();
+Schedule::command('points:close-week')->dailyAt('00:05')->timezone(config('app.week_timezone'))->withoutOverlapping();
 Schedule::command('activitylog:clean')->daily()->withoutOverlapping();
+Schedule::command('tasks:expire-offers')->hourly()->withoutOverlapping();
+Schedule::command('tasks:release-overdue')->hourly()->withoutOverlapping();
 Schedule::command('tasks:generate-instances')->hourly()->withoutOverlapping();
+Schedule::command('households:close-stale-departures')->daily()->withoutOverlapping();

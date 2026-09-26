@@ -3,41 +3,29 @@
 namespace App\Actions\HouseholdUser;
 
 use App\Models\Household;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
+use App\Models\HouseholdUser;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('manageMembers', 'household')]
 class ListHouseholdUsersAction
 {
     use AsAction;
 
     /**
-     * @throws AuthorizationException
+     * @return Collection<int, HouseholdUser>
      */
-    public function handle(User $user, Household $household): Collection
+    public function handle(Household $household): Collection
     {
-        if (! $user->isAdminOf($household)) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
         return $household->householdUsers()->with('user')->get();
     }
 
-    public function asController(Request $request, Household $household): JsonResponse
+    /**
+     * @return array{household: Household, household_users: Collection<int, HouseholdUser>}
+     */
+    public function asController(Household $household): array
     {
-        try {
-            $household_users = $this->handle($request->user(), $household);
-
-            return response()->json(['household' => $household, 'household_users' => $household_users]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['household' => $household, 'household_users' => $this->handle($household)];
     }
 }

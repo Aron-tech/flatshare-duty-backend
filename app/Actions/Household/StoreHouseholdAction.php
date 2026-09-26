@@ -6,7 +6,7 @@ use App\Enums\RoleEnum;
 use App\Http\Requests\StoreHouseholdRequest;
 use App\Models\Household;
 use App\Models\User;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -14,9 +14,14 @@ class StoreHouseholdAction
 {
     use AsAction;
 
+    /**
+     * The creator becomes the admin of the new household.
+     *
+     * @param  array{name: string}  $data
+     */
     public function handle(User $user, array $data): Household
     {
-        return DB::transaction(fn () => $user->households()->create([
+        return DB::transaction(fn (): Household => $user->households()->create([
             ...$data,
             'created_by' => $user->id,
         ], [
@@ -24,16 +29,11 @@ class StoreHouseholdAction
         ]));
     }
 
-    public function asController(StoreHouseholdRequest $request): JsonResponse
+    /**
+     * @return array{household: Household, message: string}
+     */
+    public function asController(StoreHouseholdRequest $request, #[CurrentUser] User $user): array
     {
-        try {
-            $household = $this->handle($request->user(), $request->validated());
-
-            return response()->json(['household' => $household, 'message' => __('app.success_action')]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['household' => $this->handle($user, $request->validated()), 'message' => __('app.success_action')];
     }
 }

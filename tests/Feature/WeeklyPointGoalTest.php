@@ -69,7 +69,7 @@ function goalOf(Household $household, User $user): WeeklyPointGoal
 
 beforeEach(function () {
     Queue::fake();
-    $this->travelTo(now()->startOfWeek());
+    $this->travelTo(WeeklyPointGoal::weekStartsAt());
     $this->user = goalUser();
     $this->household = Household::create(['name' => 'Home', 'join_code' => '0000000001', 'created_by' => $this->user->id]);
     $this->household->users()->attach($this->user->id, ['role' => RoleEnum::ADMIN]);
@@ -124,7 +124,7 @@ it('does not penalize a member who reached the tolerance', function () {
     $this->travel(1)->week();
     CloseWeeklyPointGoalsAction::run();
 
-    $goal = WeeklyPointGoal::whereDate('week_starts_at', now()->subWeek()->toDateString())->sole();
+    $goal = WeeklyPointGoal::whereDate('week_starts_at', WeeklyPointGoal::weekDate(now()->subWeek()))->sole();
     expect($goal->closed_at)->not->toBeNull()
         ->and($goal->earned_points)->toBe(90)
         ->and($goal->shortfall_points)->toBe(10)
@@ -132,7 +132,24 @@ it('does not penalize a member who reached the tolerance', function () {
     Queue::assertNothingPushed();
 });
 
-it('assigns the cheapest task worth more than the shortfall when the minimum is missed', function () {
+it('deducts the points covering the minimum when the week is closed and keeps the extra points', function (int $earned, int $balance, int $expected_balance) {
+    goalTask($this->household, 'Dishes', 100);
+    earnPoints($this->household, $this->user, $earned);
+    $this->household->householdUsers()->update(['points_balance' => $balance]);
+
+    $this->travel(1)->week();
+    CloseWeeklyPointGoalsAction::run();
+    CloseWeeklyPointGoalsAction::run();
+
+    expect($this->household->householdUsers()->sole()->points_balance)->toBe($expected_balance)
+        ->and(PointTransaction::where('type', PointTransactionType::WEEKLY_GOAL_SETTLEMENT)->sum('amount'))->toBe($balance - $expected_balance);
+})->with([
+    'extra points' => [130, 150, 50],
+    'within the tolerance' => [95, 95, 0],
+    'below the minimum' => [40, 60, 20],
+]);
+
+it('assigns the cheapest task worth more than the shortfall below the tolerance when the minimum is missed', function () {
     goalTask($this->household, 'Dishes', 100);
     goalTask($this->household, 'Windows', 30, ['is_recurring' => false, 'recurrence_interval' => null, 'recurrence_unit' => null]);
     goalTask($this->household, 'Laundry', 50, ['is_recurring' => false, 'recurrence_interval' => null, 'recurrence_unit' => null]);
@@ -144,11 +161,12 @@ it('assigns the cheapest task worth more than the shortfall when the minimum is 
 
     $penalty = TaskInstanceUser::whereNotNull('weekly_point_goal_id')->with('taskInstance.task')->sole();
     expect($penalty->user_id)->toBe($this->user->id)
-        ->and($penalty->taskInstance->task->name)->toBe('Laundry')
-        ->and($penalty->taskInstance->due_at->equalTo(now()->startOfWeek()->addWeek()))->toBeTrue()
+        ->and($penalty->taskInstance->task->name)->toBe('Windows')
+        ->and($penalty->penalty_points)->toBe(22)
+        ->and($penalty->taskInstance->due_at->equalTo(WeeklyPointGoal::weekEndsAt(WeeklyPointGoal::weekStartsAt())))->toBeTrue()
         ->and($penalty->weeklyPointGoal->shortfall_points)->toBe(40);
     Queue::assertPushed(SendExpoPushNotificationsJob::class, 1);
-    Queue::assertPushed(SendExpoPushNotificationsJob::class, fn ($job) => str_contains($job->body, 'Laundry'));
+    Queue::assertPushed(SendExpoPushNotificationsJob::class, fn ($job) => str_contains($job->body, 'Windows'));
 });
 
 it('assigns the most valuable tasks when no single task covers the shortfall', function () {
@@ -162,7 +180,17 @@ it('assigns the most valuable tasks when no single task covers the shortfall', f
     expect($picked->pluck('name')->all())->toBe(['Task 1', 'Task 2']);
 });
 
-it('gives no points for completing a penalty task', function () {
+it('grows the penalty from zero at the tolerance', function (int $earned, int $expected) {
+    $goal = new WeeklyPointGoal(['target_points' => 100]);
+
+    expect($goal->penaltyPoints($earned))->toBe($expected);
+})->with([
+    'reached the tolerance' => [90, 0],
+    'just below the tolerance' => [89, 1],
+    'nothing earned' => [0, 90],
+]);
+
+it('pays only the points of a penalty task above the shortfall it covers', function () {
     goalTask($this->household, 'Dishes', 100);
     $this->travel(1)->week();
     CloseWeeklyPointGoalsAction::run();
@@ -170,11 +198,12 @@ it('gives no points for completing a penalty task', function () {
 
     $this->getJson("/api/households/{$this->household->id}/task-instances")
         ->assertJsonPath('claimed.0.is_penalty', true)
-        ->assertJsonPath('claimed.0.points', 0);
+        ->assertJsonPath('claimed.0.points', 10);
 
     $this->postJson("/api/households/{$this->household->id}/task-instances/{$penalty->task_instance_id}/complete")
         ->assertOk()
-        ->assertJsonPath('points', 0);
+        ->assertJsonPath('points', 10)
+        ->assertJsonPath('weekly_points', 10);
 
     expect(PointTransaction::sole()->type)->toBe(PointTransactionType::PENALTY_TASK_COMPLETION)
         ->and($penalty->taskInstance->refresh()->status)->toBe(TaskInstanceStatusEnum::ACCEPTED);

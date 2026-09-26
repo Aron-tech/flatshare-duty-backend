@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('name');
             $table->foreignIdFor(User::class, 'created_by')->constrained('users');
             $table->string('join_code', 10)->unique();
+            $table->jsonb('settings')->nullable();
             $table->timestamps();
 
             $table->index('join_code');

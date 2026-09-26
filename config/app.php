@@ -68,6 +68,13 @@ return [
     'timezone' => 'UTC',
 
     /*
+    | The weekly point cycle (weekly goals, weekly points, stats) runs from Monday 00:00 to Monday 00:00
+    | in this timezone, like the client's cycle. The timestamps are still stored in UTC.
+    */
+
+    'week_timezone' => env('APP_WEEK_TIMEZONE', 'Europe/Budapest'),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration
     |--------------------------------------------------------------------------

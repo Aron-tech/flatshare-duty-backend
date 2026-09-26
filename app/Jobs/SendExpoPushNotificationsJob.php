@@ -6,12 +6,12 @@ use App\Models\PushToken;
 use App\Services\Expo\ExpoPushClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\Tries;
 
+#[Tries(3)]
 class SendExpoPushNotificationsJob implements ShouldQueue
 {
     use Queueable;
-
-    public int $tries = 3;
 
     /**
      * @param  array<int, string>  $tokens

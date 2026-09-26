@@ -3,15 +3,15 @@
 namespace App\Actions\HouseholdReward;
 
 use App\Actions\CalculateHouseholdMinPointsAction;
+use App\Actions\CalculateTaskPointsAction;
 use App\Enums\RewardDifficultyEnum;
 use App\Http\Requests\CalculateRewardDifficultyRequest;
 use App\Models\Household;
 use App\Models\Task;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class CalculateRewardDifficultyAction
 {
     use AsAction;
@@ -20,29 +20,15 @@ class CalculateRewardDifficultyAction
      * Tells how hard it is for a member to earn the reward's points in the household.
      *
      * @return array{points_cost: int, difficulty: ?string, difficulty_label: ?string, weekly_points_per_member: int, average_task_points: ?int, weeks_needed: ?float, tasks_needed: ?int}
-     *
-     * @throws AuthorizationException
      */
-    public function handle(User $user, Household $household, int $points_cost): array
-    {
-        if (! $user->households()->whereKey($household->id)->exists()) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        return $this->calculate($household, $points_cost);
-    }
-
-    /**
-     * @return array{points_cost: int, difficulty: ?string, difficulty_label: ?string, weekly_points_per_member: int, average_task_points: ?int, weeks_needed: ?float, tasks_needed: ?int}
-     */
-    public function calculate(Household $household, int $points_cost): array
+    public function handle(Household $household, int $points_cost): array
     {
         return $this->evaluate($this->householdAverages($household), $points_cost);
     }
 
     /**
      * The household's point averages the difficulty is based on, calculated once so many rewards can be evaluated with them.
-     * The weekly points come from the recurring tasks, the average task points from every task, both use the average member weight.
+     * The weekly points come from the recurring tasks, the average task points from every task, both use the common weight of the members.
      *
      * @return array{weekly_points_per_member: int, average_task_points: ?float}
      */
@@ -50,10 +36,11 @@ class CalculateRewardDifficultyAction
     {
         $member_ids = $household->householdUsers()->pluck('user_id');
 
+        $calculate_task_points = CalculateTaskPointsAction::make();
         $average_task_points = $household->tasks()
             ->with(['userWeights' => fn ($query) => $query->whereIn('user_id', $member_ids)])
             ->get()
-            ->avg(fn (Task $task) => $task->base_points * ($task->userWeights->avg(fn ($user_weight) => $user_weight->weight->multiplier()) ?? 1.0));
+            ->avg(fn (Task $task): float => $task->base_points * $calculate_task_points->weightMultiplier($task, $member_ids));
 
         return [
             'weekly_points_per_member' => CalculateHouseholdMinPointsAction::run($household),
@@ -92,16 +79,11 @@ class CalculateRewardDifficultyAction
         ];
     }
 
-    public function asController(CalculateRewardDifficultyRequest $request, Household $household): JsonResponse
+    /**
+     * @return array{points_cost: int, difficulty: ?string, difficulty_label: ?string, weekly_points_per_member: int, average_task_points: ?int, weeks_needed: ?float, tasks_needed: ?int}
+     */
+    public function asController(CalculateRewardDifficultyRequest $request, Household $household): array
     {
-        try {
-            return response()->json($this->handle($request->user(), $household, $request->integer('points_cost')));
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return $this->handle($household, $request->integer('points_cost'));
     }
 }

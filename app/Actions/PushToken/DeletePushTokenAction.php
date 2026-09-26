@@ -4,28 +4,28 @@ namespace App\Actions\PushToken;
 
 use App\Http\Requests\DeletePushTokenRequest;
 use App\Models\User;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Container\Attributes\CurrentUser;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class DeletePushTokenAction
 {
     use AsAction;
 
+    /**
+     * Only the user's own token is deleted, e.g. at logout.
+     */
     public function handle(User $user, string $token): void
     {
         $user->pushTokens()->where('token', $token)->delete();
     }
 
-    public function asController(DeletePushTokenRequest $request): JsonResponse
+    /**
+     * @return array{message: string}
+     */
+    public function asController(DeletePushTokenRequest $request, #[CurrentUser] User $user): array
     {
-        try {
-            $this->handle($request->user(), $request->validated('token'));
+        $this->handle($user, $request->validated('token'));
 
-            return response()->json(['message' => __('app.success_action')]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['message' => __('app.success_action')];
     }
 }

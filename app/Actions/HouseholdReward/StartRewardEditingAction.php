@@ -4,13 +4,11 @@ namespace App\Actions\HouseholdReward;
 
 use App\Models\Household;
 use App\Models\Reward;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('update', 'reward')]
 class StartRewardEditingAction
 {
     use AsAction;
@@ -18,30 +16,19 @@ class StartRewardEditingAction
     /**
      * Marks the reward as being edited by its creator, so nobody can redeem it meanwhile.
      * Calling it again restarts the editing timeout.
-     *
-     * @throws AuthorizationException
      */
-    public function handle(User $user, Household $household, Reward $reward): Reward
+    public function handle(Reward $reward): Reward
     {
-        if ($reward->household_id !== $household->id || ! $reward->canBeEditedBy($user)) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        DB::transaction(fn () => $reward->update(['is_editing' => true, 'editing_started_at' => now()]));
+        DB::transaction(fn (): bool => $reward->update(['is_editing' => true, 'editing_started_at' => now()]));
 
         return $reward;
     }
 
-    public function asController(Request $request, Household $household, Reward $reward): JsonResponse
+    /**
+     * @return array{reward: Reward}
+     */
+    public function asController(Household $household, Reward $reward): array
     {
-        try {
-            return response()->json(['reward' => $this->handle($request->user(), $household, $reward)]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['reward' => $this->handle($reward)];
     }
 }

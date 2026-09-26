@@ -5,7 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\TaskUserWeightEnum;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rule;
 
 class StoreTaskUserWeightRequest extends FormRequest
 {
@@ -17,7 +17,7 @@ class StoreTaskUserWeightRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'weight' => ['required', new Enum(TaskUserWeightEnum::class)],
+            'weight' => ['required', Rule::enum(TaskUserWeightEnum::class)],
         ];
     }
 }

@@ -21,6 +21,7 @@ class TaskObserver
         $task->taskInstances()->create([
             'household_id' => $task->household_id,
             'status' => TaskInstanceStatusEnum::PENDING,
+            'due_at' => $task->addRecurrencePeriod(now()),
         ]);
     }
 }

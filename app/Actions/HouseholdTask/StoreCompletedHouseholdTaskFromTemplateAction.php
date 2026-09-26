@@ -8,10 +8,12 @@ use App\Models\PointTransaction;
 use App\Models\TaskTemplate;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Container\Attributes\CurrentUser;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class StoreCompletedHouseholdTaskFromTemplateAction
 {
     use AsAction;
@@ -26,35 +28,21 @@ class StoreCompletedHouseholdTaskFromTemplateAction
      */
     public function handle(User $user, Household $household, TaskTemplate $task_template, array $data = []): PointTransaction
     {
-        return DB::transaction(function () use ($user, $household, $task_template, $data) {
+        return DB::transaction(function () use ($user, $household, $task_template, $data): PointTransaction {
             $task = StoreHouseholdTaskFromTemplateAction::make()->handle($user, $household, $task_template, [
                 'max_user' => $data['max_user'] ?? null,
                 'is_recurring' => false,
             ]);
-            if (! $task) {
-                throw new AuthorizationException(__('app.no_permission'));
-            }
 
             return LogHouseholdTaskCompletionAction::make()->handle($user, $household, $task, $task->taskInstances()->first());
         });
     }
 
-    public function asController(StoreHouseholdTaskFromTemplateRequest $request, Household $household, TaskTemplate $task_template): JsonResponse
+    /**
+     * @return array{points: int, points_balance: int, message: string}
+     */
+    public function asController(StoreHouseholdTaskFromTemplateRequest $request, #[CurrentUser] User $user, Household $household, TaskTemplate $task_template): array
     {
-        try {
-            $point_transaction = $this->handle($request->user(), $household, $task_template, $request->validated());
-
-            return response()->json([
-                'points' => $point_transaction->amount,
-                'points_balance' => $point_transaction->balance_after,
-                'message' => __('app.success_action'),
-            ]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return LogHouseholdTaskCompletionAction::pointsResponse($this->handle($user, $household, $task_template, $request->validated()));
     }
 }

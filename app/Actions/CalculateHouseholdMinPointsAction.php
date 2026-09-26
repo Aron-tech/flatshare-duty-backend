@@ -5,7 +5,9 @@ namespace App\Actions;
 use App\Enums\RecurrenceUnitEnum;
 use App\Models\Household;
 use App\Models\Task;
+use App\Models\WeeklyPointGoal;
 use Carbon\CarbonImmutable;
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -13,20 +15,20 @@ class CalculateHouseholdMinPointsAction
 {
     use AsAction;
 
-    private const HOURS_PER_WEEK = 168;
+    private const int HOURS_PER_WEEK = 168;
 
-    private const DAYS_PER_WEEK = 7;
+    private const int DAYS_PER_WEEK = 7;
 
-    private const DAYS_PER_MONTH = 30.4375;
+    private const float DAYS_PER_MONTH = 30.4375;
 
-    private const DAYS_PER_YEAR = 365.25;
+    private const float DAYS_PER_YEAR = 365.25;
 
     /**
-     * Calculates the points every member has to earn in a week so the household's chores get done.
-     * Only the base points and the average member weight are used, the frequency, bounty and solo bonuses are ignored.
-     * The weekly point pool of all the tasks is split evenly between the members.
-     * With a given week, a recurring task added during that week only counts for the remaining part of the week.
-     * Instant (non-recurring) tasks count in full in every week they were open in, see instantPoints().
+     * Calculates the points every member has to earn in the household's goal period (a week or a month) so the chores get done.
+     * Only the base points and the common weight of the members are used, the overdue bounty is ignored.
+     * The weekly point pool of all the tasks, scaled to the length of the period, is split evenly between the members.
+     * With a given period, a recurring task added during that period only counts for the remaining part of the period.
+     * Instant (non-recurring) tasks count in full in every period they were open in, see instantPoints().
      */
     public function handle(Household $household, ?CarbonImmutable $week_starts_at = null): int
     {
@@ -37,49 +39,66 @@ class CalculateHouseholdMinPointsAction
         }
 
         $tasks = $household->tasks()
-            ->where('is_recurring', true)
+            ->recurring()
             ->with(['userWeights' => fn ($query) => $query->whereIn('user_id', $member_ids)])
             ->get();
 
-        $weekly_points = $tasks->sum(fn (Task $task) => $this->weeklyPoints($task) * $this->activeFraction($task->created_at, $week_starts_at));
-        $weekly_points += $this->instantPoints($household, $member_ids, $week_starts_at ?? CarbonImmutable::now()->startOfWeek());
+        $period_starts_at = $week_starts_at ?? WeeklyPointGoal::weekStartsAt(null, $household);
+        $weeks_in_period = $this->weeksInPeriod($household, $period_starts_at);
 
-        return (int) round($weekly_points / $member_ids->count());
+        $period_points = $tasks->sum(fn (Task $task): float => $this->weeklyPoints($task, $member_ids) * $weeks_in_period * $this->activeFraction($task->created_at, $week_starts_at, $household));
+        $period_points += $this->instantPoints($household, $member_ids, $period_starts_at);
+
+        return (int) round($period_points / $member_ids->count());
     }
 
     /**
-     * The points of the instant (non-recurring) tasks that were open during the week: created before the week ended
-     * and not completed before the week started. An unfinished task therefore carries over to the next week.
+     * The length of the period in weeks, counted in calendar days so a daylight saving change does not matter.
+     */
+    public function weeksInPeriod(Household $household, CarbonImmutable $week_starts_at): float
+    {
+        $timezone = config('app.week_timezone');
+        $starts_on = $week_starts_at->setTimezone($timezone)->startOfDay();
+        $ends_on = WeeklyPointGoal::weekEndsAt($week_starts_at, $household)->setTimezone($timezone)->startOfDay();
+
+        return round($starts_on->diffInDays($ends_on)) / self::DAYS_PER_WEEK;
+    }
+
+    /**
+     * The points of the instant (non-recurring) tasks that were open during the period: created before the period ended
+     * and not completed before the period started. An unfinished task therefore carries over to the next period.
+     * A penalty task instance is one member's extra work, it does not raise everyone's goal, see AssignWeeklyGoalPenaltyAction.
      *
      * @param  Collection<int, int>  $member_ids
      */
     private function instantPoints(Household $household, Collection $member_ids, CarbonImmutable $week_starts_at): float
     {
-        $week_ends_at = $week_starts_at->addWeek();
+        $week_ends_at = WeeklyPointGoal::weekEndsAt($week_starts_at, $household);
 
         return $household->tasks()
             ->withTrashed()
-            ->where('is_recurring', false)
+            ->oneOff()
             ->with([
                 'userWeights' => fn ($query) => $query->whereIn('user_id', $member_ids),
                 'taskInstances' => fn ($query) => $query
+                    ->whereDoesntHave('taskInstanceUsers', fn ($query) => $query->withTrashed()->whereNotNull('weekly_point_goal_id'))
                     ->where('created_at', '<', $week_ends_at)
                     ->where(fn ($query) => $query->whereNull('completed_at')->orWhere('completed_at', '>=', $week_starts_at)),
             ])
             ->get()
-            ->sum(fn (Task $task) => $this->taskPoints($task) * $task->taskInstances->count());
+            ->sum(fn (Task $task): float => $this->taskPoints($task, $member_ids) * $task->taskInstances->count());
     }
 
     /**
-     * The part of the week (0-1) that is left after the given moment, 1 when no week is given.
+     * The part of the period (0-1) that is left after the given moment, 1 when no period is given.
      */
-    public function activeFraction(?\DateTimeInterface $since, ?CarbonImmutable $week_starts_at): float
+    public function activeFraction(?DateTimeInterface $since, ?CarbonImmutable $week_starts_at, ?Household $household = null): float
     {
         if (! $since || ! $week_starts_at) {
             return 1.0;
         }
 
-        $week_ends_at = $week_starts_at->addWeek();
+        $week_ends_at = WeeklyPointGoal::weekEndsAt($week_starts_at, $household);
         $active_from = CarbonImmutable::instance($since)->max($week_starts_at);
         if ($active_from->greaterThanOrEqualTo($week_ends_at)) {
             return 0.0;
@@ -88,19 +107,22 @@ class CalculateHouseholdMinPointsAction
         return $active_from->diffInSeconds($week_ends_at) / $week_starts_at->diffInSeconds($week_ends_at);
     }
 
-    private function weeklyPoints(Task $task): float
+    /**
+     * @param  Collection<int, int>  $member_ids
+     */
+    private function weeklyPoints(Task $task, Collection $member_ids): float
     {
-        return $this->taskPoints($task) * $this->occurrencesPerWeek($task);
+        return $this->taskPoints($task, $member_ids) * $this->occurrencesPerWeek($task);
     }
 
     /**
-     * The points of one occurrence, every allowed assignee included.
+     * The points of one occurrence. The claimers share them, so a task is worth the same however many members do it.
+     *
+     * @param  Collection<int, int>  $member_ids
      */
-    private function taskPoints(Task $task): float
+    private function taskPoints(Task $task, Collection $member_ids): float
     {
-        $average_multiplier = $task->userWeights->avg(fn ($user_weight) => $user_weight->weight->multiplier()) ?? 1.0;
-
-        return $task->base_points * $average_multiplier * $task->max_user;
+        return $task->base_points * CalculateTaskPointsAction::make()->weightMultiplier($task, $member_ids);
     }
 
     private function occurrencesPerWeek(Task $task): float

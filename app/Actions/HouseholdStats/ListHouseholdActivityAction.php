@@ -6,11 +6,12 @@ use App\Enums\PointTransactionType;
 use App\Models\Household;
 use App\Models\PointTransaction;
 use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
+use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class ListHouseholdActivityAction
 {
     use AsAction;
@@ -27,20 +28,14 @@ class ListHouseholdActivityAction
      *     data: list<array{id: int, user_id: int, user_name: string, is_me: bool, task_name: string, category_icon: ?string, points: int, completed_at: string}>,
      *     next_cursor: ?int,
      * }
-     *
-     * @throws AuthorizationException
      */
     public function handle(User $user, Household $household, int $limit = self::DEFAULT_LIMIT, ?int $cursor = null): array
     {
-        if (! $user->households()->whereKey($household->id)->exists()) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
         $limit = max(1, min($limit, self::MAX_LIMIT));
 
         $transactions = PointTransaction::query()
             ->where('household_id', $household->id)
-            ->where('type', PointTransactionType::TASK_COMPLETION)
+            ->whereIn('type', PointTransactionType::earnedTypes())
             ->when($cursor, fn ($query) => $query->where('id', '<', $cursor))
             ->with(['user', 'taskInstance.task.category'])
             ->orderByDesc('id')
@@ -52,7 +47,7 @@ class ListHouseholdActivityAction
 
         return [
             'data' => $page
-                ->map(fn (PointTransaction $point_transaction) => [
+                ->map(fn (PointTransaction $point_transaction): array => [
                     'id' => $point_transaction->id,
                     'user_id' => $point_transaction->user_id,
                     'user_name' => $point_transaction->user->name,
@@ -68,26 +63,21 @@ class ListHouseholdActivityAction
         ];
     }
 
-    public function asController(Request $request, Household $household): JsonResponse
+    /**
+     * @return array{data: list<array<string, mixed>>, next_cursor: ?int}
+     */
+    public function asController(Request $request, #[CurrentUser] User $user, Household $household): array
     {
-        $validated = $request->validate([
+        $request->validate([
             'cursor' => ['nullable', 'integer', 'min:1'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_LIMIT],
         ]);
 
-        try {
-            return response()->json($this->handle(
-                $request->user(),
-                $household,
-                (int) ($validated['limit'] ?? self::DEFAULT_LIMIT),
-                isset($validated['cursor']) ? (int) $validated['cursor'] : null,
-            ));
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return $this->handle(
+            $user,
+            $household,
+            $request->integer('limit', self::DEFAULT_LIMIT),
+            $request->filled('cursor') ? $request->integer('cursor') : null,
+        );
     }
 }

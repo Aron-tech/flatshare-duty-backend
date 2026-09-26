@@ -2,6 +2,8 @@
 
 namespace App\Actions\HouseholdReward;
 
+use App\Actions\GetHouseholdUserAction;
+use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Enums\PointTransactionType;
 use App\Models\Household;
 use App\Models\HouseholdUser;
@@ -10,33 +12,33 @@ use App\Models\Reward;
 use App\Models\RewardRedemption;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Container\Attributes\CurrentUser;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+/**
+ * Any member can redeem the reward except its creator, see RewardPolicy::redeem().
+ */
+#[Authorize('redeem', 'reward')]
 class RedeemHouseholdRewardAction
 {
     use AsAction;
 
     /**
-     * Redeems the reward for the user from their points balance.
-     * The creator cannot redeem their own reward, and a reward being edited cannot be redeemed.
+     * Redeems the reward for the user from their spendable points, see HouseholdUser::spendablePoints().
+     * A reward being edited cannot be redeemed.
+     * A reward without a stock limit can be redeemed once a day by anyone in the household.
      *
      * @throws AuthorizationException
      */
     public function handle(User $user, Household $household, Reward $reward): PointTransaction
     {
-        $household_user = $household->householdUsers()->where('user_id', $user->id)->first();
-        if (! $household_user || $reward->household_id !== $household->id) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
+        $household_user = GetHouseholdUserAction::run($user, $household);
 
-        if ($reward->user_id === $user->id) {
-            throw new AuthorizationException(__('app.reward_own_not_redeemable'));
-        }
+        RecalculateWeeklyPointGoalsAction::make()->currentGoals($household);
 
-        return DB::transaction(function () use ($household_user, $reward) {
+        return DB::transaction(function () use ($household_user, $reward): PointTransaction {
             $reward = Reward::query()->lockForUpdate()->findOrFail($reward->id);
             $household_user = HouseholdUser::query()->lockForUpdate()->findOrFail($household_user->id);
 
@@ -48,7 +50,11 @@ class RedeemHouseholdRewardAction
                 throw new AuthorizationException(__('app.reward_not_redeemable'));
             }
 
-            if ($household_user->points_balance < $reward->points_cost) {
+            if ($reward->stock_quantity === null && $reward->redemptions()->where('created_at', '>=', now(config('app.week_timezone'))->startOfDay()->utc())->exists()) {
+                throw new AuthorizationException(__('app.reward_redeemed_today'));
+            }
+
+            if ($household_user->spendablePoints() < $reward->points_cost) {
                 throw new AuthorizationException(__('app.reward_not_enough_points'));
             }
 
@@ -76,21 +82,11 @@ class RedeemHouseholdRewardAction
         });
     }
 
-    public function asController(Request $request, Household $household, Reward $reward): JsonResponse
+    /**
+     * @return array{points_balance: int, message: string}
+     */
+    public function asController(#[CurrentUser] User $user, Household $household, Reward $reward): array
     {
-        try {
-            $point_transaction = $this->handle($request->user(), $household, $reward);
-
-            return response()->json([
-                'points_balance' => $point_transaction->balance_after,
-                'message' => __('app.success_action'),
-            ]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['points_balance' => $this->handle($user, $household, $reward)->balance_after, 'message' => __('app.success_action')];
     }
 }

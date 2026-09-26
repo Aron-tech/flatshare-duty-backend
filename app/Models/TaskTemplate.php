@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use App\Concerns\CalculatesBasePoints;
 use App\Concerns\SerializesTranslationsInLocale;
+use App\Enums\LanguageEnum;
 use App\Enums\TaskDifficultyEnum;
 use App\Observers\TaskTemplateObserver;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -17,6 +19,7 @@ use Spatie\Translatable\HasTranslations;
 #[ObservedBy([TaskTemplateObserver::class])]
 class TaskTemplate extends Model
 {
+    use CalculatesBasePoints;
     use HasTranslations;
     use SerializesTranslationsInLocale;
 
@@ -32,16 +35,25 @@ class TaskTemplate extends Model
         ];
     }
 
-    public static function invalidateCache(): void
+    /**
+     * The templates with their category, serialized in the current locale. They rarely change, so they are cached per locale
+     * as plain arrays (the cache does not unserialize objects, see config cache.serializable_classes).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function cachedInLocale(): array
     {
-        cache()->forget(self::CACHE_KEY);
+        return cache()->rememberForever(
+            self::CACHE_KEY.'.'.app()->getLocale(),
+            fn (): array => self::query()->with('category')->orderBy('id')->get()->toArray(),
+        );
     }
 
-    public function calculateBasePoints(): self
+    public static function invalidateCache(): void
     {
-        $this->base_points = (int) round($this->difficulty->multiplier() * $this->duration_minutes);
-
-        return $this;
+        foreach (LanguageEnum::cases() as $language) {
+            cache()->forget(self::CACHE_KEY.'.'.$language->value);
+        }
     }
 
     public function category(): BelongsTo

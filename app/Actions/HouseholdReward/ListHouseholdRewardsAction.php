@@ -4,13 +4,11 @@ namespace App\Actions\HouseholdReward;
 
 use App\Models\Household;
 use App\Models\Reward;
-use App\Models\User;
-use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class ListHouseholdRewardsAction
 {
     use AsAction;
@@ -18,38 +16,27 @@ class ListHouseholdRewardsAction
     /**
      * Lists the household's rewards, each with how hard it is to earn its points.
      *
-     * @throws AuthorizationException
+     * @return Collection<int, Reward>
      */
-    public function handle(User $user, Household $household): Collection
+    public function handle(Household $household): Collection
     {
-        if (! $user->households()->whereKey($household->id)->exists()) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
         $calculate_difficulty = CalculateRewardDifficultyAction::make();
         $averages = $calculate_difficulty->householdAverages($household);
 
         return $household->rewards()
             ->with('user')
             ->get()
-            ->each(fn (Reward $reward) => $reward->forceFill([
+            ->each(fn (Reward $reward): Reward => $reward->forceFill([
                 'is_editing' => $reward->isBeingEdited(),
                 'difficulty' => $calculate_difficulty->evaluate($averages, $reward->points_cost),
             ]));
     }
 
-    public function asController(Request $request, Household $household): JsonResponse
+    /**
+     * @return array{household: Household, rewards: Collection<int, Reward>}
+     */
+    public function asController(Household $household): array
     {
-        try {
-            $household_rewards = $this->handle($request->user(), $household);
-
-            return response()->json(['household' => $household, 'rewards' => $household_rewards]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['household' => $household, 'rewards' => $this->handle($household)];
     }
 }

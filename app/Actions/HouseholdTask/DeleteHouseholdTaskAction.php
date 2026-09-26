@@ -2,51 +2,50 @@
 
 namespace App\Actions\HouseholdTask;
 
-use App\Enums\RoleEnum;
+use App\Actions\TaskOffer\ExpireTaskOffersAction;
 use App\Enums\TaskInstanceStatusEnum;
 use App\Models\Household;
-use App\Models\HouseholdUser;
 use App\Models\Task;
 use App\Models\TaskInstanceUser;
-use App\Models\User;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+/**
+ * A child member cannot delete tasks, see TaskPolicy.
+ */
+#[Authorize('delete', 'task')]
 class DeleteHouseholdTaskAction
 {
     use AsAction;
 
-    public function handle(User $user, Household $household, Task $task): bool
+    /**
+     * The pending instances and their claims are deleted with the task, the completed ones stay for the history.
+     * The open offers of the deleted task instances are refunded right away, see ExpireTaskOffersAction.
+     */
+    public function handle(Task $task): bool
     {
-        $household_user = HouseholdUser::where('household_id', $household->id)->where('user_id', $user->id)->first();
-        if (! $household_user || $household_user->role === RoleEnum::CHILD || $task->household_id !== $household->id) {
-            return false;
-        }
-
-        return DB::transaction(function () use ($task) {
+        $is_deleted = DB::transaction(function () use ($task): bool {
             $pending_instances = $task->taskInstances()->where('status', TaskInstanceStatusEnum::PENDING);
             TaskInstanceUser::query()->whereIn('task_instance_id', (clone $pending_instances)->select('id'))->delete();
             $pending_instances->delete();
             $task->userWeights()->delete();
 
-            return $task->delete();
+            return (bool) $task->delete();
         });
+
+        ExpireTaskOffersAction::run($task->household_id);
+
+        return $is_deleted;
     }
 
-    public function asController(Request $request, Household $household, Task $task): JsonResponse
+    /**
+     * @return array{message: string}
+     */
+    public function asController(Household $household, Task $task): array
     {
-        try {
-            if (! $this->handle($request->user(), $household, $task)) {
-                return response()->json(['message' => __('app.no_permission')], 403);
-            }
+        $this->handle($task);
 
-            return response()->json(['message' => __('app.success_action')]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['message' => __('app.success_action')];
     }
 }

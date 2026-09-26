@@ -7,7 +7,7 @@ use App\Enums\RecurrenceUnitEnum;
 use App\Enums\TaskDifficultyEnum;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreHouseholdTaskRequest extends FormRequest
@@ -28,10 +28,10 @@ class StoreHouseholdTaskRequest extends FormRequest
             'category_id' => ['nullable', 'int', 'exists:categories,id'],
             'icon' => ['nullable', 'string', 'max:255'],
             'duration_minutes' => ['required', 'int', 'min:1'],
-            'difficulty' => ['required', new Enum(TaskDifficultyEnum::class)],
+            'difficulty' => ['required', Rule::enum(TaskDifficultyEnum::class)],
             'is_recurring' => ['nullable', 'boolean'],
             'recurrence_interval' => ['nullable', 'int', 'min:1'],
-            'recurrence_unit' => ['nullable', new Enum(RecurrenceUnitEnum::class)],
+            'recurrence_unit' => ['nullable', Rule::enum(RecurrenceUnitEnum::class)],
             'max_user' => ['nullable', 'int', 'min:1'],
             ...$this->assignmentRules(),
         ];

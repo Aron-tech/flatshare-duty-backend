@@ -8,6 +8,7 @@ use App\Models\PointTransaction;
 use App\Models\Task;
 use App\Models\TaskInstance;
 use App\Models\User;
+use App\Models\WeeklyPointGoal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
@@ -59,7 +60,7 @@ function statsTransaction(Household $household, User $user, int $amount, PointTr
 }
 
 beforeEach(function () {
-    $this->travelTo(now()->startOfWeek());
+    $this->travelTo(WeeklyPointGoal::weekStartsAt());
     $this->user = statsUser('Me');
     $this->other = statsUser('Other');
     $this->household = Household::create(['name' => 'Home', 'join_code' => '0000000001', 'created_by' => $this->user->id]);
@@ -99,7 +100,9 @@ it('returns the cycle totals and the members ordered by points', function () {
 
 it('lists the overdue claims and the charged penalties', function () {
     $overdue = statsInstance($this->household, ['due_at' => now()->subDay()]);
-    $overdue->taskInstanceUsers()->create(['user_id' => $this->other->id]);
+    // A határidő előtt vállalta; a határidő utáni vállalás mentés, nem büntetés.
+    $overdue->taskInstanceUsers()->create(['user_id' => $this->other->id])->forceFill(['created_at' => now()->subDays(2)])->save();
+    statsInstance($this->household, ['due_at' => now()->subDay()])->taskInstanceUsers()->create(['user_id' => $this->user->id]);
     statsInstance($this->household, ['due_at' => now()->addDay()])->taskInstanceUsers()->create(['user_id' => $this->other->id]);
 
     $missed = statsInstance($this->household, ['status' => TaskInstanceStatusEnum::EXPIRED]);

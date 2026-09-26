@@ -2,68 +2,49 @@
 
 namespace App\Actions;
 
-use App\Enums\TaskInstanceStatusEnum;
 use App\Models\Household;
 use App\Models\TaskInstance;
 use App\Models\TaskInstanceUser;
-use App\Models\TaskUserWeight;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Container\Attributes\CurrentUser;
+use Illuminate\Routing\Attributes\Controllers\Authorize;
 use Illuminate\Support\Facades\DB;
 use Lorisleiva\Actions\Concerns\AsAction;
 
+#[Authorize('view', 'household')]
 class ClaimTaskInstanceAction
 {
     use AsAction;
 
     /**
+     * The points are shared between the claimers, see CalculateTaskPointsAction, so nobody can join
+     * once a claimer has completed their part and got their share. The exception is an overdue instance:
+     * the part of a released claim has to be taken over, see ReleaseOverdueTaskClaimsAction.
+     *
      * @throws AuthorizationException
      */
-    public function handle(User $user, Household $household, TaskInstance $task_instance): TaskInstanceUser
+    public function handle(User $user, TaskInstance $task_instance): TaskInstanceUser
     {
-        if (
-            $task_instance->household_id !== $household->id
-            || ! $user->households()->whereKey($household->id)->exists()
-        ) {
-            throw new AuthorizationException(__('app.no_permission'));
-        }
-
-        $has_weight = TaskUserWeight::query()
-            ->where('user_id', $user->id)
-            ->where('task_id', $task_instance->task_id)
-            ->exists();
-        if (! $has_weight) {
-            throw new AuthorizationException(__('app.task_weight_required'));
-        }
-
-        return DB::transaction(function () use ($user, $task_instance) {
+        return DB::transaction(function () use ($user, $task_instance): TaskInstanceUser {
             $task_instance = TaskInstance::query()->with('task')->lockForUpdate()->findOrFail($task_instance->id);
-
-            $is_open = $task_instance->status === TaskInstanceStatusEnum::PENDING && ! $task_instance->completed_at;
             $claims = $task_instance->taskInstanceUsers()->get();
 
-            if (! $is_open || $claims->contains('user_id', $user->id) || $claims->count() >= $task_instance->task->max_user) {
+            if (! $task_instance->isOpen() || $claims->contains('user_id', $user->id) || ! $task_instance->isJoinable($claims)) {
                 throw new AuthorizationException(__('app.task_instance_not_claimable'));
             }
 
-            return $task_instance->taskInstanceUsers()->create(['user_id' => $user->id]);
+            return $task_instance->claimFor($user->id);
         });
     }
 
-    public function asController(Request $request, Household $household, TaskInstance $task_instance): JsonResponse
+    /**
+     * @return array{message: string}
+     */
+    public function asController(#[CurrentUser] User $user, Household $household, TaskInstance $task_instance): array
     {
-        try {
-            $this->handle($request->user(), $household, $task_instance);
+        $this->handle($user, $task_instance);
 
-            return response()->json(['message' => __('app.success_action')]);
-        } catch (AuthorizationException $e) {
-            return response()->json(['message' => $e->getMessage()], 403);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['message' => __('app.success_action')];
     }
 }

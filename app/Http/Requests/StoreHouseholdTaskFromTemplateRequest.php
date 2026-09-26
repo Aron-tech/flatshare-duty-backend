@@ -6,7 +6,7 @@ use App\Concerns\ValidatesTaskAssignment;
 use App\Enums\RecurrenceUnitEnum;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rules\Enum;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreHouseholdTaskFromTemplateRequest extends FormRequest
@@ -23,7 +23,7 @@ class StoreHouseholdTaskFromTemplateRequest extends FormRequest
         return [
             'is_recurring' => ['nullable', 'boolean'],
             'recurrence_interval' => ['nullable', 'required_if_accepted:is_recurring', 'int', 'min:1'],
-            'recurrence_unit' => ['nullable', 'required_if_accepted:is_recurring', new Enum(RecurrenceUnitEnum::class)],
+            'recurrence_unit' => ['nullable', 'required_if_accepted:is_recurring', Rule::enum(RecurrenceUnitEnum::class)],
             'max_user' => ['nullable', 'int', 'min:1'],
             ...$this->assignmentRules(),
         ];

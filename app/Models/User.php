@@ -6,6 +6,7 @@ use App\Enums\LanguageEnum;
 use App\Enums\RoleEnum;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -24,9 +25,12 @@ class User extends Authenticatable
         ];
     }
 
-    public function getNameAttribute(): string
+    /**
+     * The nickname, or the full name when the user has not set one.
+     */
+    protected function name(): Attribute
     {
-        return $this->nickname ?? $this->getFullName();
+        return Attribute::get(fn (): string => $this->nickname ?? $this->getFullName());
     }
 
     public function getFullName(): string
@@ -39,15 +43,36 @@ class User extends Authenticatable
         return $this->belongsToMany(Household::class, 'household_users')->using(HouseholdUser::class)->withTimestamps();
     }
 
+    public function householdUsers(): HasMany
+    {
+        return $this->hasMany(HouseholdUser::class);
+    }
+
     public function pushTokens(): HasMany
     {
         return $this->hasMany(PushToken::class);
     }
 
+    /**
+     * The user's membership in the household, null when the user is not a member.
+     */
+    public function membershipOf(Household|int $household): ?HouseholdUser
+    {
+        return $this->membershipQuery($household)->first();
+    }
+
+    public function isMemberOf(Household|int $household): bool
+    {
+        return $this->membershipQuery($household)->exists();
+    }
+
     public function isAdminOf(Household|int $household): bool
     {
-        $household_id = $household instanceof Household ? $household->id : $household;
+        return $this->membershipQuery($household)->where('role', RoleEnum::ADMIN)->exists();
+    }
 
-        return $this->households()->where('household_id', $household_id)->wherePivot('role', RoleEnum::ADMIN)->exists();
+    private function membershipQuery(Household|int $household): HasMany
+    {
+        return $this->householdUsers()->where('household_id', $household instanceof Household ? $household->getKey() : $household);
     }
 }

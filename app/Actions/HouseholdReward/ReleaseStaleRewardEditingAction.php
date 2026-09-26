@@ -2,6 +2,7 @@
 
 namespace App\Actions\HouseholdReward;
 
+use App\Concerns\WritesCommandOutput;
 use App\Models\Reward;
 use Illuminate\Console\Command;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -9,8 +10,9 @@ use Lorisleiva\Actions\Concerns\AsAction;
 class ReleaseStaleRewardEditingAction
 {
     use AsAction;
+    use WritesCommandOutput;
 
-    public string $commandSignature = 'rewards:release-stale-editing';
+    public string $commandSignature = 'rewards:release-stale-editing {--output : Eredmény kiírása a konzolra}';
 
     public string $commandDescription = 'Visszaállítja az is_editing-et false-ra a túl régóta szerkesztés alatt álló jutalmaknál.';
 
@@ -31,6 +33,6 @@ class ReleaseStaleRewardEditingAction
 
     public function asCommand(Command $command): void
     {
-        $command->info("Felszabadított jutalmak: {$this->handle()}");
+        $this->writeOutput($command, "Felszabadított jutalmak: {$this->handle()}");
     }
 }

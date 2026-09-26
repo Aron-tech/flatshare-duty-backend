@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\CalculatesBasePoints;
 use App\Concerns\DataTrait;
 use App\Concerns\LogsModelActivity;
 use App\Enums\RecurrenceUnitEnum;
@@ -9,9 +10,13 @@ use App\Enums\TaskAssignmentModeEnum;
 use App\Enums\TaskDifficultyEnum;
 use App\Observers\TaskObserver;
 use App\Observers\WeeklyPointGoalObserver;
+use App\Policies\TaskPolicy;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,8 +25,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['task_template_id', 'household_id', 'created_by', 'name', 'description', 'category_id', 'icon', 'duration_minutes', 'difficulty', 'base_points', 'is_recurring', 'recurrence_interval', 'recurrence_unit', 'assignment_mode', 'fixed_user_id', 'last_assigned_user_id', 'max_user', 'data'])]
 #[ObservedBy([TaskObserver::class, WeeklyPointGoalObserver::class])]
+#[UsePolicy(TaskPolicy::class)]
 class Task extends Model
 {
+    use CalculatesBasePoints;
     use DataTrait;
     use LogsModelActivity;
     use SoftDeletes;
@@ -41,11 +48,16 @@ class Task extends Model
         ];
     }
 
-    public function calculateBasePoints(): self
+    /**
+     * The end of the recurrence period starting at the given moment, null for a non-recurring task.
+     */
+    public function addRecurrencePeriod(CarbonInterface $from): ?CarbonImmutable
     {
-        $this->base_points = (int) round($this->difficulty->multiplier() * $this->duration_minutes);
+        if (! $this->is_recurring || ! $this->recurrence_unit || ! $this->recurrence_interval) {
+            return null;
+        }
 
-        return $this;
+        return CarbonImmutable::instance($from)->add($this->recurrence_unit->value, $this->recurrence_interval);
     }
 
     /**
@@ -54,12 +66,24 @@ class Task extends Model
     #[Scope]
     protected function named(Builder $query, string $name): void
     {
-        $query->whereRaw('lower(name) = ?', [mb_strtolower(trim($name))]);
+        $query->whereRaw('lower(name) = ?', [$name |> trim(...) |> mb_strtolower(...)]);
+    }
+
+    #[Scope]
+    protected function recurring(Builder $query, bool $is_recurring = true): void
+    {
+        $query->where('is_recurring', $is_recurring);
+    }
+
+    #[Scope]
+    protected function oneOff(Builder $query): void
+    {
+        $query->where('is_recurring', false);
     }
 
     public static function loadFromTemplate(TaskTemplate $task_template, array $data = [], ?string $locale = null): self
     {
-        $locale = $locale ?? app()->getLocale();
+        $locale ??= app()->getLocale();
         $template_attributes = $task_template->only(array_diff($task_template->getFillable(), ['name', 'description']));
 
         $translations = [
@@ -67,7 +91,7 @@ class Task extends Model
             'description' => $task_template->getTranslation('description', $locale),
         ];
 
-        return (new self)->forceFill(array_merge($template_attributes, $translations, $data));
+        return new self()->forceFill([...$template_attributes, ...$translations, ...$data]);
     }
 
     public function taskTemplate(): BelongsTo

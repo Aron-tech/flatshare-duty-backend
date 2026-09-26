@@ -16,7 +16,7 @@ class WeeklyPointGoalObserver
     /**
      * Only these attributes affect the minimum points, e.g. renaming or assigning a task does not.
      */
-    private const array TASK_POINT_ATTRIBUTES = ['base_points', 'is_recurring', 'recurrence_interval', 'recurrence_unit', 'max_user', 'deleted_at'];
+    private const array TASK_POINT_ATTRIBUTES = ['base_points', 'is_recurring', 'recurrence_interval', 'recurrence_unit', 'deleted_at'];
 
     /**
      * The changes are checked right away, a later save in the same transaction would overwrite them.

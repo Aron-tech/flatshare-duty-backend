@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Concerns\LogsModelActivity;
+use App\Policies\RewardPolicy;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable(['household_id', 'user_id', 'name', 'description', 'points_cost', 'stock_quantity', 'is_active', 'is_editing', 'editing_started_at'])]
+#[UsePolicy(RewardPolicy::class)]
 class Reward extends Model
 {
     use LogsModelActivity {
@@ -40,22 +43,6 @@ class Reward extends Model
             'is_editing' => 'boolean',
             'editing_started_at' => 'datetime',
         ];
-    }
-
-    /**
-     * Only the creator of the reward can edit it.
-     */
-    public function canBeEditedBy(User $user): bool
-    {
-        return $this->user_id === $user->id;
-    }
-
-    /**
-     * The creator of the reward and the admins of its household can delete it.
-     */
-    public function canBeDeletedBy(User $user): bool
-    {
-        return $this->canBeEditedBy($user) || $user->isAdminOf($this->household_id);
     }
 
     /**

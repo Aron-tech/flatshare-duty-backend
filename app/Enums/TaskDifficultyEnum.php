@@ -4,17 +4,22 @@ namespace App\Enums;
 
 enum TaskDifficultyEnum: string
 {
-    case EASY   = 'easy';
+    case EASY = 'easy';
     case MEDIUM = 'medium';
-    case HARD   = 'hard';
+    case HARD = 'hard';
 
     public function multiplier(): float
     {
         return match ($this) {
-            self::EASY   => 1.0,
+            self::EASY => 1.0,
             self::MEDIUM => 1.2,
-            self::HARD   => 1.5,
+            self::HARD => 1.5,
         };
+    }
+
+    public function basePoints(int $duration_minutes): int
+    {
+        return (int) round($this->multiplier() * $duration_minutes);
     }
 
     public function getName(): string
@@ -22,7 +27,7 @@ enum TaskDifficultyEnum: string
         return __('enum.task_difficulty.'.$this->value);
     }
 
-     /**
+    /**
      * @return array<int, array{value: string, label: string}>
      */
     public static function getOptions(): array

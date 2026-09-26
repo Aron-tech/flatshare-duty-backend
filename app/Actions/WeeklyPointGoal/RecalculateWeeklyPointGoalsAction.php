@@ -17,15 +17,15 @@ class RecalculateWeeklyPointGoalsAction
     use AsAction;
 
     /**
-     * Updates the members' minimum points of the week (the current one by default) from the household's tasks.
-     * A task or a member added during the week only counts for the remaining part of the week.
+     * Updates the members' minimum points of the goal period (the current one by default) from the household's tasks.
+     * A task or a member added during the period only counts for the remaining part of the period.
      * Closed goals are left untouched, the open goals of former members are removed.
      *
      * @return Collection<int, WeeklyPointGoal> keyed by user id
      */
     public function handle(Household $household, ?CarbonImmutable $week_starts_at = null): Collection
     {
-        $week_starts_at ??= CarbonImmutable::now()->startOfWeek();
+        $week_starts_at ??= WeeklyPointGoal::weekStartsAt(null, $household);
         $calculate_min_points = CalculateHouseholdMinPointsAction::make();
         $points_per_member = $calculate_min_points->handle($household, $week_starts_at);
         $household_users = $household->householdUsers()->get();
@@ -40,7 +40,7 @@ class RecalculateWeeklyPointGoalsAction
             WeeklyPointGoal::insertOrIgnore($household_users->map(fn (HouseholdUser $household_user): array => [
                 'household_id' => $household->id,
                 'user_id' => $household_user->user_id,
-                'week_starts_at' => $week_starts_at->toDateString(),
+                'week_starts_at' => WeeklyPointGoal::weekDate($week_starts_at),
                 'target_points' => 0,
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -51,7 +51,7 @@ class RecalculateWeeklyPointGoalsAction
                     ->where('user_id', $household_user->user_id)
                     ->whereNull('closed_at')
                     ->update([
-                        'target_points' => (int) round($points_per_member * $calculate_min_points->activeFraction($household_user->created_at, $week_starts_at)),
+                        'target_points' => (int) round($points_per_member * $calculate_min_points->activeFraction($household_user->created_at, $week_starts_at, $household)),
                         'updated_at' => $now,
                     ]);
             }
@@ -61,13 +61,13 @@ class RecalculateWeeklyPointGoalsAction
     }
 
     /**
-     * The goals of the current week, calculated first when a member does not have one yet.
+     * The goals of the current period, calculated first when a member does not have one yet.
      *
      * @return Collection<int, WeeklyPointGoal> keyed by user id
      */
     public function currentGoals(Household $household): Collection
     {
-        $goals = $this->goalsOfWeek($household, CarbonImmutable::now()->startOfWeek())->get()->keyBy('user_id');
+        $goals = $this->goalsOfWeek($household, WeeklyPointGoal::weekStartsAt(null, $household))->get()->keyBy('user_id');
         $member_ids = $household->householdUsers()->pluck('user_id');
 
         if ($member_ids->diff($goals->keys())->isNotEmpty()) {
@@ -80,10 +80,10 @@ class RecalculateWeeklyPointGoalsAction
     /**
      * @return Builder<WeeklyPointGoal>
      */
-    private function goalsOfWeek(Household $household, CarbonImmutable $week_starts_at): Builder
+    public function goalsOfWeek(Household $household, CarbonImmutable $week_starts_at): Builder
     {
         return WeeklyPointGoal::query()
             ->where('household_id', $household->id)
-            ->whereDate('week_starts_at', $week_starts_at->toDateString());
+            ->whereDate('week_starts_at', WeeklyPointGoal::weekDate($week_starts_at));
     }
 }

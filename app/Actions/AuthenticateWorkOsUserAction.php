@@ -8,18 +8,24 @@ use App\Models\User;
 use App\Services\WorkOS\WorkOSService;
 use Illuminate\Http\JsonResponse;
 use Lorisleiva\Actions\Concerns\AsAction;
+use Throwable;
 
 class AuthenticateWorkOsUserAction
 {
     use AsAction;
 
     public function __construct(
-        protected WorkOSService $workOsService
+        private readonly WorkOSService $work_os_service,
     ) {}
 
+    /**
+     * Signs in the WorkOS user, creating or updating the local user by e-mail, and issues an API token.
+     *
+     * @return array{user: User, token: string}
+     */
     public function handle(string $code, ?string $fallback_locale = null): array
     {
-        $response = $this->workOsService->authenticateWithCode($code);
+        $response = $this->work_os_service->authenticateWithCode($code);
         $work_os_user = $response->user;
 
         $detected_locale = $work_os_user->locale ?? $fallback_locale;
@@ -33,14 +39,12 @@ class AuthenticateWorkOsUserAction
                 'last_name' => $work_os_user->lastName,
                 'avatar' => $work_os_user->profilePictureUrl ?: null,
                 'language' => $language?->value ?? LanguageEnum::HUNGARIAN->value,
-            ], fn ($value) => ! is_null($value))
+            ], fn (mixed $value): bool => $value !== null)
         );
-
-        $token = $user->createToken('mobile-app')->plainTextToken;
 
         return [
             'user' => $user,
-            'token' => $token,
+            'token' => $user->createToken('mobile-app')->plainTextToken,
         ];
     }
 
@@ -56,7 +60,7 @@ class AuthenticateWorkOsUserAction
                 'token' => $result['token'],
                 'user' => $result['user'],
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // The exception message may contain internal details (e.g. SQL), it is only logged.
             report($e);
 

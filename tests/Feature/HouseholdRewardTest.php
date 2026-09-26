@@ -8,6 +8,7 @@ use App\Models\Reward;
 use App\Models\RewardRedemption;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\WeeklyPointGoal;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
@@ -216,6 +217,41 @@ it('does not redeem a reward being edited or without enough points', function ()
     expect(RewardRedemption::count())->toBe(0);
 });
 
+it('lets anyone redeem a reward without a stock limit only once a day', function () {
+    $reward = householdReward($this->household, $this->admin);
+    $other = householdRewardUser();
+    $this->household->users()->attach($other->id, ['role' => RoleEnum::USER, 'points_balance' => 100]);
+    $this->household->householdUsers()->where('user_id', $this->child->id)->update(['points_balance' => 200]);
+
+    Sanctum::actingAs($this->child);
+    $this->postJson("{$this->url}/{$reward->id}/redeem")->assertOk();
+    $this->postJson("{$this->url}/{$reward->id}/redeem")->assertForbidden()->assertJsonPath('message', __('app.reward_redeemed_today'));
+
+    Sanctum::actingAs($other);
+    $this->postJson("{$this->url}/{$reward->id}/redeem")->assertForbidden();
+
+    $this->travelTo(now()->addDay()->startOfDay());
+    $this->postJson("{$this->url}/{$reward->id}/redeem")->assertOk();
+});
+
+it('does not let the points covering the weekly minimum be spent', function () {
+    $this->travelTo(WeeklyPointGoal::weekStartsAt());
+    $this->household->householdUsers()->update(['created_at' => now()]);
+    householdRewardTask($this->household);
+    $reward = householdReward($this->household, $this->admin);
+    $this->household->householdUsers()->where('user_id', $this->child->id)->update(['points_balance' => 90]);
+    PointTransaction::create([
+        'household_id' => $this->household->id,
+        'user_id' => $this->child->id,
+        'amount' => 60,
+        'balance_after' => 90,
+        'type' => PointTransactionType::TASK_COMPLETION,
+    ]);
+    Sanctum::actingAs($this->child);
+
+    $this->postJson("{$this->url}/{$reward->id}/redeem")->assertForbidden()->assertJsonPath('message', __('app.reward_not_enough_points'));
+});
+
 it('lets only the creator or an admin delete a reward of the household', function () {
     $reward = householdReward($this->household, $this->admin);
     $other_household = Household::create(['name' => 'Other', 'join_code' => '0000000002', 'created_by' => $this->admin->id]);
@@ -225,7 +261,7 @@ it('lets only the creator or an admin delete a reward of the household', functio
     $this->deleteJson("{$this->url}/{$reward->id}")->assertForbidden();
 
     Sanctum::actingAs($this->admin);
-    $this->deleteJson("{$this->url}/{$other_reward->id}")->assertForbidden();
+    $this->deleteJson("{$this->url}/{$other_reward->id}")->assertNotFound();
     $this->deleteJson("{$this->url}/{$reward->id}")->assertOk();
 
     expect(Reward::pluck('id')->all())->toBe([$other_reward->id]);

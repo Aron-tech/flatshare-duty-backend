@@ -3,16 +3,21 @@
 namespace App\Observers;
 
 use App\Models\Category;
+use App\Models\TaskTemplate;
 
 class CategoryObserver
 {
-    public function created(Category $category): void
+    /**
+     * The cached task templates contain their category.
+     */
+    public function saved(Category $category): void
     {
         Category::invalidateCache();
+        TaskTemplate::invalidateCache();
     }
 
-    public function updated(Category $category): void
+    public function deleted(Category $category): void
     {
-        Category::invalidateCache();
+        $this->saved($category);
     }
 }

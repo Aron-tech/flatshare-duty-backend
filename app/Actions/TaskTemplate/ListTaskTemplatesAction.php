@@ -3,8 +3,6 @@
 namespace App\Actions\TaskTemplate;
 
 use App\Models\TaskTemplate;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Lorisleiva\Actions\Concerns\AsAction;
 
@@ -12,21 +10,22 @@ class ListTaskTemplatesAction
 {
     use AsAction;
 
+    /**
+     * The task templates in the current locale, grouped by their category name. They come from the cache, see TaskTemplate::cachedInLocale().
+     *
+     * @return Collection<string, Collection<int, array<string, mixed>>>
+     */
     public function handle(): Collection
     {
-        return TaskTemplate::query()->with('category')->get()->groupBy(fn ($task) => $task->category?->name ?? __('app.other'));
+        return collect(TaskTemplate::cachedInLocale())
+            ->groupBy(fn (array $task_template): string => $task_template['category']['name'] ?? __('app.other'));
     }
 
-    public function asController(Request $request): JsonResponse
+    /**
+     * @return array{task_templates: Collection<string, Collection<int, array<string, mixed>>>}
+     */
+    public function asController(): array
     {
-        try {
-            $task_templates = $this->handle();
-
-            return response()->json(['task_templates' => $task_templates]);
-        } catch (\Throwable $e) {
-            report($e);
-
-            return response()->json(['message' => __('app.failed_action')], 500);
-        }
+        return ['task_templates' => $this->handle()];
     }
 }
