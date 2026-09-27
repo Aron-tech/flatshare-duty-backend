@@ -1,10 +1,14 @@
 <?php
 
+use App\Actions\CalculateHouseholdMinPointsAction;
 use App\Enums\RoleEnum;
 use App\Models\Household;
 use App\Models\Task;
 use App\Models\TaskUserWeight;
 use App\Models\User;
+use App\Models\WeeklyPointGoal;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -99,4 +103,72 @@ it('carries an unfinished instant task over to the next week', function () {
     $task->taskInstances()->update(['created_at' => now()->subWeeks(3)]);
 
     expect($this->household->min_points)->toBe(50);
+});
+
+function minPointsCloseWeek(Household $household, int $weeks_ago): void
+{
+    WeeklyPointGoal::create([
+        'household_id' => $household->id,
+        'user_id' => $household->created_by,
+        'week_starts_at' => WeeklyPointGoal::weekDate(WeeklyPointGoal::weekStartsAt(now()->subWeeks($weeks_ago), $household)),
+        'target_points' => 0,
+        'closed_at' => now(),
+    ]);
+}
+
+function minPointsCompletedInstantTask(Household $household, CarbonInterface $created_at, int $base_points = 100): void
+{
+    $task = minPointsTask($household, ['is_recurring' => false, 'recurrence_unit' => null, 'recurrence_interval' => null, 'base_points' => $base_points]);
+    $task->taskInstances()->create(['household_id' => $household->id, 'status' => 'accepted', 'completed_at' => $created_at]);
+    $task->taskInstances()->update(['created_at' => $created_at]);
+}
+
+describe('learning the instant tasks', function () {
+    beforeEach(function () {
+        $this->travelTo(CarbonImmutable::parse('2026-09-23 12:00', config('app.week_timezone')));
+        $this->household->forceFill(['created_at' => now()->subWeeks(6)])->save();
+    });
+
+    it('expects as many instant task points as the previous closed weeks had', function () {
+        minPointsCompletedInstantTask($this->household, now()->subWeek());
+
+        expect($this->household->min_points)->toBe(0);
+
+        minPointsCloseWeek($this->household, 1);
+
+        expect($this->household->refresh()->min_points)->toBe(50);
+    });
+
+    it('weighs the recent weeks more', function () {
+        minPointsCompletedInstantTask($this->household, now()->subWeek());
+        minPointsCompletedInstantTask($this->household, now()->subWeeks(2), 400);
+        minPointsCloseWeek($this->household, 1);
+        minPointsCloseWeek($this->household, 2);
+
+        expect($this->household->min_points)->toBe(100);
+    });
+
+    it('counts the instant tasks of the week when they are worth more than the learned points', function () {
+        minPointsCompletedInstantTask($this->household, now()->subWeek());
+        minPointsCloseWeek($this->household, 1);
+        minPointsInstantTask($this->household);
+        minPointsInstantTask($this->household);
+
+        expect($this->household->min_points)->toBe(100);
+    });
+
+    it('counts only the real instant tasks of a period that has ended', function () {
+        minPointsCompletedInstantTask($this->household, now()->subWeeks(2));
+        minPointsCloseWeek($this->household, 2);
+
+        expect(CalculateHouseholdMinPointsAction::run($this->household, WeeklyPointGoal::weekStartsAt(now()->subWeek(), $this->household)))->toBe(0);
+    });
+
+    it('does not learn from a week that started before the household was created', function () {
+        $this->household->forceFill(['created_at' => now()->subWeek()])->save();
+        minPointsCompletedInstantTask($this->household, now()->subWeek());
+        minPointsCloseWeek($this->household, 1);
+
+        expect($this->household->refresh()->min_points)->toBe(0);
+    });
 });

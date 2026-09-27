@@ -44,6 +44,7 @@ class CloseWeeklyPointGoalsAction
     /**
      * The goals of the previous period are calculated first unless it is already closed,
      * so the members are penalized even when nobody opened the app during that period.
+     * The goals of the current period are calculated after the closing, so they learn from the period just closed.
      *
      * @return int the number of penalized goals
      */
@@ -56,7 +57,6 @@ class CloseWeeklyPointGoalsAction
         if (! $recalculate->goalsOfWeek($household, $previous_period)->whereNotNull('closed_at')->exists()) {
             $recalculate->handle($household, $previous_period);
         }
-        $recalculate->handle($household, $current_period);
 
         $penalized = 0;
         WeeklyPointGoal::query()
@@ -71,6 +71,7 @@ class CloseWeeklyPointGoalsAction
                     $this->notify($goal->refresh(), $penalty_claims);
                 }
             });
+        $recalculate->handle($household, $current_period);
 
         return $penalized;
     }

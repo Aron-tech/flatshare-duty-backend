@@ -225,3 +225,13 @@ it('reminds the members who are behind only once a week', function () {
     Queue::assertPushed(SendExpoPushNotificationsJob::class, fn ($job) => $job->tokens === ["ExpoPushToken[{$member->id}]"]
         && str_contains($job->body, '50'));
 });
+
+it('learns the next week\'s goal from the instant tasks of the week just closed', function () {
+    $task = goalTask($this->household, 'Trash', 50, ['is_recurring' => false, 'recurrence_interval' => null, 'recurrence_unit' => null]);
+    $task->taskInstances()->update(['status' => TaskInstanceStatusEnum::ACCEPTED, 'completed_at' => now()->addDay()]);
+
+    $this->travel(1)->weeks();
+    CloseWeeklyPointGoalsAction::run();
+
+    expect(goalOf($this->household, $this->user)->target_points)->toBe(50);
+});

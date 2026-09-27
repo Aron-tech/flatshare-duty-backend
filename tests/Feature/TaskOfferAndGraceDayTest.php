@@ -355,6 +355,7 @@ it('does not raise the goals of the household with a penalty instance of an inst
     CloseWeeklyPointGoalsAction::run();
     expect(TaskInstanceUser::whereNotNull('weekly_point_goal_id')->where('user_id', $this->user->id)->exists())->toBeTrue();
 
+    $this->household->forceFill(['created_at' => now()])->save();
     $goals = RecalculateWeeklyPointGoalsAction::run($this->household);
     expect($goals->pluck('target_points')->all())->toBe([0, 0]);
 });
