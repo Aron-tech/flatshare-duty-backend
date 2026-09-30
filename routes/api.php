@@ -1,6 +1,10 @@
 <?php
 
 use App\Actions\AuthenticateWorkOsUserAction;
+use App\Actions\Calendar\ExportHouseholdCalendarFeedAction;
+use App\Actions\Calendar\GetHouseholdCalendarSubscriptionAction;
+use App\Actions\Calendar\ListHouseholdCalendarEventsAction;
+use App\Actions\Calendar\ResetHouseholdCalendarSubscriptionAction;
 use App\Actions\ClaimTaskInstanceAction;
 use App\Actions\CompleteTaskInstanceAction;
 use App\Actions\GetHouseholdUserAction;
@@ -44,21 +48,33 @@ use App\Actions\ListTaskInstancesAction;
 use App\Actions\PushToken\DeletePushTokenAction;
 use App\Actions\PushToken\StorePushTokenAction;
 use App\Actions\RequestTaskInstanceGraceDayAction;
+use App\Actions\StickerAlbum\GetStickerAlbumAction;
+use App\Actions\StickerAlbum\MarkStickersSeenAction;
 use App\Actions\StoreTaskUserWeightAction;
 use App\Actions\TaskOffer\AcceptTaskOfferAction;
 use App\Actions\TaskOffer\CancelTaskOfferAction;
 use App\Actions\TaskOffer\StoreTaskOfferAction;
 use App\Actions\TaskTemplate\ListTaskTemplatesAction;
+use App\Actions\User\DeleteUserAccountAction;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Middleware\EnsureAppClientMiddleware;
 use App\Http\Middleware\SetAppLocaleMiddleware;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/workos', AuthenticateWorkOsUserAction::class);
 
+// The calendar apps cannot send a bearer token (nor the app key), the secret token of the membership in the address authenticates the feed.
+Route::get('calendar/{token}.ics', ExportHouseholdCalendarFeedAction::class)
+    ->where('token', '[A-Za-z0-9]+')
+    ->middleware('throttle:60,1')
+    ->withoutMiddleware(EnsureAppClientMiddleware::class)
+    ->name('calendar.feed');
+
 // A nyelv a hitelesített user `language` mezőjéből jön, ezért az auth után fut.
 Route::middleware(['auth:sanctum', SetAppLocaleMiddleware::class])->group(function (): void {
     Route::get('user/me', [UserController::class, 'me']);
     Route::put('user/me', [UserController::class, 'update']);
+    Route::delete('user/me', DeleteUserAccountAction::class);
 
     Route::post('push-tokens', StorePushTokenAction::class);
     Route::delete('push-tokens', DeletePushTokenAction::class);
@@ -85,6 +101,13 @@ Route::middleware(['auth:sanctum', SetAppLocaleMiddleware::class])->group(functi
         Route::get('/me', GetHouseholdUserAction::class);
         Route::get('/stats', GetHouseholdStatsAction::class);
         Route::get('/activity', ListHouseholdActivityAction::class);
+
+        Route::get('/sticker-album', GetStickerAlbumAction::class);
+        Route::post('/sticker-album/seen', MarkStickersSeenAction::class);
+
+        Route::get('/calendar', ListHouseholdCalendarEventsAction::class);
+        Route::post('/calendar/subscription', GetHouseholdCalendarSubscriptionAction::class);
+        Route::delete('/calendar/subscription', ResetHouseholdCalendarSubscriptionAction::class);
 
         Route::get('/member-departures', ListHouseholdMemberDeparturesAction::class);
         Route::post('/member-departures/{member_departure}/resolve', ResolveHouseholdMemberDepartureAction::class);

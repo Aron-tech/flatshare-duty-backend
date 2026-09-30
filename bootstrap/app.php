@@ -8,6 +8,7 @@ use App\Actions\TaskOffer\ExpireTaskOffersAction;
 use App\Actions\TaskWeightNotification\NotifyUnweightedTasksAction;
 use App\Actions\WeeklyPointGoal\CloseWeeklyPointGoalsAction;
 use App\Actions\WeeklyPointGoal\RemindWeeklyPointGoalsAction;
+use App\Http\Middleware\EnsureAppClientMiddleware;
 use App\Models\Household;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
@@ -35,7 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
         CloseStaleMemberDeparturesAction::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Only our mobile app may call the API, see EnsureAppClientMiddleware.
+        $middleware->api(prepend: [EnsureAppClientMiddleware::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

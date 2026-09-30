@@ -24,4 +24,12 @@ class WorkOSService
             $code
         );
     }
+
+    /**
+     * @throws WorkOSException
+     */
+    public function deleteUser(string $work_os_user_id): void
+    {
+        new UserManagement()->deleteUser($work_os_user_id);
+    }
 }

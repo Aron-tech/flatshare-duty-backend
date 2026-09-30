@@ -114,6 +114,37 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Mobile App Client Keys
+    |--------------------------------------------------------------------------
+    |
+    | The API only answers requests that send one of these keys in the
+    | X-App-Key header (see EnsureAppClientMiddleware). Comma separated, so a
+    | new key can be added before the old one is retired.
+    |
+    */
+
+    'client_keys' => array_values(array_filter(
+        array_map(trim(...), explode(',', (string) env('API_CLIENT_KEYS', '')))
+    )),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Contact
+    |--------------------------------------------------------------------------
+    |
+    | Shown on the public pages (landing, privacy policy, account deletion).
+    |
+    */
+
+    'contact_email' => env('APP_CONTACT_EMAIL', 'aron.papp2003@gmail.com'),
+
+    'store_links' => [
+        'app_store' => env('APP_STORE_URL'),
+        'google_play' => env('GOOGLE_PLAY_URL'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Maintenance Mode Driver
     |--------------------------------------------------------------------------
     |

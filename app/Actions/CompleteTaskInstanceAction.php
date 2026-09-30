@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Actions\StickerAlbum\SyncTaskStickersAction;
 use App\Actions\TaskOffer\SettleTaskOfferAction;
 use App\Actions\WeeklyPointGoal\RecalculateWeeklyPointGoalsAction;
 use App\Enums\PointTransactionType;
@@ -30,6 +31,7 @@ class CompleteTaskInstanceAction
      * A task taken over through an offer also pays out the offered points (DELEGATION_PAYOUT), and the user's own open offer
      * of the task is withdrawn with a refund, see SettleTaskOfferAction.
      * The task instance itself is closed once every claimer has completed their part.
+     * A completion reaching a milestone of the task unlocks a sticker of the user's sticker album, see SyncTaskStickersAction.
      *
      * @throws AuthorizationException
      */
@@ -37,7 +39,7 @@ class CompleteTaskInstanceAction
     {
         $household_user = GetHouseholdUserAction::run($user, $household);
 
-        return DB::transaction(function () use ($user, $household_user, $task_instance): PointTransaction {
+        return DB::transaction(function () use ($user, $household, $household_user, $task_instance): PointTransaction {
             $task_instance = TaskInstance::query()->with('task')->lockForUpdate()->findOrFail($task_instance->id);
             $claims = $task_instance->taskInstanceUsers()->lockForUpdate()->get();
             $claim = $claims->firstWhere('user_id', $user->id);
@@ -47,6 +49,7 @@ class CompleteTaskInstanceAction
             }
 
             $claim->update(['completed_at' => now()]);
+            SyncTaskStickersAction::run($user, $household, $task_instance->task);
 
             if ($claims->every(fn (TaskInstanceUser $task_instance_user): bool => (bool) $task_instance_user->completed_at)) {
                 $task_instance->update(['status' => TaskInstanceStatusEnum::ACCEPTED, 'completed_at' => now()]);
@@ -95,8 +98,9 @@ class CompleteTaskInstanceAction
 
     /**
      * offer_points: the points paid out for a task taken over through an offer.
+     * new_sticker: the sticker unlocked by the completion, see SyncTaskStickersAction::reachedSticker().
      *
-     * @return array{points: int, offer_points: int, points_balance: int, weekly_points: int, spendable_points: int, message: string}
+     * @return array{points: int, offer_points: int, points_balance: int, weekly_points: int, spendable_points: int, new_sticker: ?array<string, mixed>, message: string}
      */
     public function asController(#[CurrentUser] User $user, Household $household, TaskInstance $task_instance): array
     {
@@ -114,6 +118,7 @@ class CompleteTaskInstanceAction
             'points_balance' => $household_user->points_balance,
             'weekly_points' => $household_user->weeklyPoints(),
             'spendable_points' => $household_user->spendablePoints(),
+            'new_sticker' => SyncTaskStickersAction::make()->reachedSticker($user, $task_instance->task),
             'message' => __('app.success_action'),
         ];
     }

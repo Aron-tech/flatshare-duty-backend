@@ -6,6 +6,7 @@ use App\Enums\LanguageEnum;
 use App\Enums\RoleEnum;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -13,6 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Appends(['name'])]
+#[Hidden(['workos_id'])]
 #[Fillable(['workos_id', 'first_name', 'last_name', 'nickname', 'email', 'avatar', 'language'])]
 class User extends Authenticatable
 {
@@ -22,15 +24,21 @@ class User extends Authenticatable
     {
         return [
             'language' => LanguageEnum::class,
+            'anonymized_at' => 'datetime',
         ];
     }
 
     /**
-     * The nickname, or the full name when the user has not set one.
+     * The nickname, or the full name when the user has not set one. A deleted account has no name anymore, see DeleteUserAccountAction.
      */
     protected function name(): Attribute
     {
-        return Attribute::get(fn (): string => $this->nickname ?? $this->getFullName());
+        return Attribute::get(fn (): string => $this->isAnonymized() ? __('app.deleted_user') : $this->nickname ?? $this->getFullName());
+    }
+
+    public function isAnonymized(): bool
+    {
+        return $this->anonymized_at !== null;
     }
 
     public function getFullName(): string

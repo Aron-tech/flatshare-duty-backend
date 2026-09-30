@@ -7,11 +7,13 @@ use App\Enums\RoleEnum;
 use App\Observers\HouseholdUserObserver;
 use App\Policies\HouseholdUserPolicy;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
+use Illuminate\Support\Str;
 use Spatie\Activitylog\Support\LogOptions;
 
 /**
@@ -19,6 +21,7 @@ use Spatie\Activitylog\Support\LogOptions;
  */
 #[Table('household_users', incrementing: true)]
 #[Fillable(['household_id', 'user_id', 'role', 'points_balance'])]
+#[Hidden(['calendar_token'])]
 #[ObservedBy([HouseholdUserObserver::class])]
 #[UsePolicy(HouseholdUserPolicy::class)]
 class HouseholdUser extends Pivot
@@ -89,6 +92,19 @@ class HouseholdUser extends Pivot
             ->count();
 
         return max(0, TaskInstanceUser::GRACE_DAYS_PER_PERIOD - $used);
+    }
+
+    /**
+     * The secret of the member's calendar feed, created on the first request, see ExportHouseholdCalendarFeedAction.
+     * It is not fillable, so it is never logged or mass assigned.
+     */
+    public function calendarToken(): string
+    {
+        if (! $this->calendar_token) {
+            $this->forceFill(['calendar_token' => Str::random(48)])->saveQuietly();
+        }
+
+        return $this->calendar_token;
     }
 
     public function household(): BelongsTo

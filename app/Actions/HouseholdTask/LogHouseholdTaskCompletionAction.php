@@ -3,6 +3,7 @@
 namespace App\Actions\HouseholdTask;
 
 use App\Actions\CompleteTaskInstanceAction;
+use App\Actions\StickerAlbum\SyncTaskStickersAction;
 use App\Enums\TaskInstanceStatusEnum;
 use App\Models\Household;
 use App\Models\PointTransaction;
@@ -57,7 +58,7 @@ class LogHouseholdTaskCompletionAction
     }
 
     /**
-     * @return array{points: int, points_balance: int, message: string}
+     * @return array{points: int, points_balance: int, new_sticker: ?array<string, mixed>, message: string}
      */
     public function asController(#[CurrentUser] User $user, Household $household, Task $task): array
     {
@@ -66,14 +67,16 @@ class LogHouseholdTaskCompletionAction
 
     /**
      * The response of the endpoints that log a task as done.
+     * new_sticker: the sticker unlocked by the completion, see SyncTaskStickersAction::reachedSticker().
      *
-     * @return array{points: int, points_balance: int, message: string}
+     * @return array{points: int, points_balance: int, new_sticker: ?array<string, mixed>, message: string}
      */
     public static function pointsResponse(PointTransaction $point_transaction): array
     {
         return [
             'points' => $point_transaction->amount,
             'points_balance' => $point_transaction->balance_after,
+            'new_sticker' => SyncTaskStickersAction::make()->reachedSticker($point_transaction->user, $point_transaction->taskInstance->task),
             'message' => __('app.success_action'),
         ];
     }

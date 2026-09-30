@@ -40,7 +40,7 @@ class StoreCompletedHouseholdTaskAction
     }
 
     /**
-     * @return array{points: int, points_balance: int, message: string}
+     * @return array{points: int, points_balance: int, new_sticker: ?array<string, mixed>, message: string}
      */
     public function asController(StoreHouseholdTaskRequest $request, #[CurrentUser] User $user, Household $household): array
     {
