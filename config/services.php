@@ -40,6 +40,17 @@ return [
         'client_id' => env('WORKOS_CLIENT_ID'),
     ],
 
+    /*
+     * Native Sign in with Apple: the client id is the app's bundle id, the key is a "Sign in with Apple" key (.p8)
+     * from the Apple Developer portal, it signs the client secret of the token and revoke requests.
+     */
+    'apple' => [
+        'client_id' => env('APPLE_CLIENT_ID'),
+        'team_id' => env('APPLE_TEAM_ID'),
+        'key_id' => env('APPLE_KEY_ID'),
+        'private_key' => env('APPLE_PRIVATE_KEY'),
+    ],
+
     'expo' => [
         'push_url' => env('EXPO_PUSH_URL', 'https://exp.host/--/api/v2/push/send'),
         'access_token' => env('EXPO_ACCESS_TOKEN'),

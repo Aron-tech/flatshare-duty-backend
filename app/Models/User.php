@@ -14,8 +14,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Appends(['name'])]
-#[Hidden(['workos_id'])]
-#[Fillable(['workos_id', 'first_name', 'last_name', 'nickname', 'email', 'avatar', 'language'])]
+#[Hidden(['workos_id', 'apple_id', 'apple_refresh_token'])]
+#[Fillable(['workos_id', 'apple_id', 'apple_refresh_token', 'first_name', 'last_name', 'nickname', 'email', 'avatar', 'language'])]
 class User extends Authenticatable
 {
     use HasApiTokens;
@@ -25,6 +25,7 @@ class User extends Authenticatable
         return [
             'language' => LanguageEnum::class,
             'anonymized_at' => 'datetime',
+            'apple_refresh_token' => 'encrypted',
         ];
     }
 

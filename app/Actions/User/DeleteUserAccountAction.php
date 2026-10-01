@@ -12,6 +12,7 @@ use App\Models\TaskUserRotation;
 use App\Models\TaskUserWeight;
 use App\Models\TaskWeightNotification;
 use App\Models\User;
+use App\Services\Apple\AppleSignInService;
 use App\Services\WorkOS\WorkOSService;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,8 @@ use Throwable;
  * - the households created by the user are deleted for every member,
  * - the user leaves every other household (claims released, rewards deleted, admins asked about the tasks, see HouseholdUserObserver),
  * - the personal settings (weights, rotations, stickers, notifications, join requests), the API and push tokens are deleted,
- * - the user is deleted from WorkOS too, so the identity provider does not keep the account.
+ * - the user is deleted from WorkOS too, so the identity provider does not keep the account,
+ * - the Sign in with Apple authorization is revoked, as the App Store requires (5.1.1(v)).
  */
 class DeleteUserAccountAction
 {
@@ -34,11 +36,13 @@ class DeleteUserAccountAction
 
     public function __construct(
         private readonly WorkOSService $work_os_service,
+        private readonly AppleSignInService $apple_sign_in_service,
     ) {}
 
     public function handle(User $user): void
     {
         $work_os_id = $user->workos_id;
+        $apple_refresh_token = $user->apple_refresh_token;
 
         DB::transaction(function () use ($user): void {
             Household::query()
@@ -60,6 +64,8 @@ class DeleteUserAccountAction
 
             $user->forceFill([
                 'workos_id' => "deleted-{$user->id}",
+                'apple_id' => null,
+                'apple_refresh_token' => null,
                 'first_name' => '',
                 'last_name' => '',
                 'nickname' => null,
@@ -69,11 +75,22 @@ class DeleteUserAccountAction
             ])->save();
         });
 
-        try {
-            $this->work_os_service->deleteUser($work_os_id);
-        } catch (Throwable $e) {
-            // The local account is already gone, the WorkOS user can be deleted by hand from the report.
-            report($e);
+        if ($work_os_id !== null) {
+            try {
+                $this->work_os_service->deleteUser($work_os_id);
+            } catch (Throwable $e) {
+                // The local account is already gone, the WorkOS user can be deleted by hand from the report.
+                report($e);
+            }
+        }
+
+        if ($apple_refresh_token !== null) {
+            try {
+                $this->apple_sign_in_service->revokeRefreshToken($apple_refresh_token);
+            } catch (Throwable $e) {
+                // The local account is already gone, the user can still revoke the app in the Apple ID settings.
+                report($e);
+            }
         }
     }
 

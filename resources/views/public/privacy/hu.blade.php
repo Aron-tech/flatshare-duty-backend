@@ -14,12 +14,12 @@
 <h2>2. Milyen adatokat kezelünk?</h2>
 
 <h3>2.1. Fiókadatok</h3>
-<p>Regisztrációhoz nem kérünk jelszót: Google- vagy Apple-fiókkal jelentkezhetsz be, a hitelesítést a WorkOS szolgáltatás végzi. Bejelentkezéskor a következőket kapjuk meg és tároljuk:</p>
+<p>Regisztrációhoz nem kérünk jelszót: Google- vagy Apple-fiókkal jelentkezhetsz be, a hitelesítést a WorkOS szolgáltatás végzi, kivéve az iPhone-on használt Apple-bejelentkezést, amelyet az Apple közvetlenül a szerverünkkel végez. Bejelentkezéskor a következőket kapjuk meg és tároljuk:</p>
 <ul>
     <li>kereszt- és vezetéknév,</li>
     <li>e-mail-cím (Apple esetén ez lehet az Apple által generált, elrejtett cím is),</li>
     <li>a profilkép webcíme (a képet nem másoljuk le, az a Google/Apple szerveréről töltődik be),</li>
-    <li>a WorkOS belső felhasználói azonosítója,</li>
+    <li>a WorkOS belső felhasználói azonosítója, illetve iPhone-os Apple-bejelentkezésnél az Apple felhasználói azonosítód és egy Apple bejelentkezési token (titkosítva, kizárólag azért, hogy a fiók törlésekor visszavonhassuk az Apple-bejelentkezést),</li>
     <li>a nyelvi beállításod (magyar/angol).</li>
 </ul>
 <p>Ezen felül tároljuk az általad megadott becenevet.</p>
@@ -106,7 +106,7 @@
 <p>A fiókodat az alkalmazásban bármikor törölheted: <strong>Profilkép → Beállítások → Fiók törlése</strong>. Ha nem férsz hozzá az alkalmazáshoz, e-mailben is kérheted. A törléskor:</p>
 <ul>
     <li>a nevedet, becenevedet, e-mail-címedet és profilképedet visszafordíthatatlanul töröljük (a fiók anonimizálódik),</li>
-    <li>töröljük a hozzáférési és push-tokenjeidet, a személyes beállításaidat és a fiókodat a WorkOS-nál,</li>
+    <li>töröljük a hozzáférési és push-tokenjeidet, a személyes beállításaidat és a fiókodat a WorkOS-nál, az Apple-nél pedig visszavonjuk az Apple-bejelentkezésed engedélyét,</li>
     <li>az általad létrehozott háztartások minden tagjuknál törlődnek,</li>
     <li>a más által létrehozott háztartásokból kilépsz; az ott közösen keletkezett előzmények egy névtelen „Törölt felhasználóhoz” kerülnek, amely nem kapcsolható hozzád.</li>
 </ul>

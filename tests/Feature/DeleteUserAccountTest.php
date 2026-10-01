@@ -5,6 +5,7 @@ use App\Models\Household;
 use App\Models\HouseholdMemberDeparture;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Apple\AppleSignInService;
 use App\Services\WorkOS\WorkOSService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -103,4 +104,16 @@ it('requires authentication', function () {
     $this->mock(WorkOSService::class, fn (MockInterface $mock) => $mock->shouldNotReceive('deleteUser'));
 
     $this->deleteJson('/api/user/me')->assertUnauthorized();
+});
+
+it('revokes the Sign in with Apple authorization of an Apple user', function () {
+    $this->user->forceFill(['workos_id' => null, 'apple_id' => 'apple-sub', 'apple_refresh_token' => 'refresh-token'])->save();
+    test()->mock(WorkOSService::class, fn (MockInterface $mock) => $mock->shouldNotReceive('deleteUser'));
+    test()->mock(AppleSignInService::class, fn (MockInterface $mock) => $mock->shouldReceive('revokeRefreshToken')->with('refresh-token')->once());
+
+    $this->deleteJson('/api/user/me')->assertOk();
+
+    $user = $this->user->fresh();
+    expect($user->apple_id)->toBeNull()
+        ->and($user->apple_refresh_token)->toBeNull();
 });

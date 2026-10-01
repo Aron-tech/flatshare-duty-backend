@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\AuthenticateAppleUserAction;
 use App\Actions\AuthenticateWorkOsUserAction;
 use App\Actions\Calendar\ExportHouseholdCalendarFeedAction;
 use App\Actions\Calendar\GetHouseholdCalendarSubscriptionAction;
@@ -62,6 +63,7 @@ use App\Http\Middleware\SetAppLocaleMiddleware;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/auth/workos', AuthenticateWorkOsUserAction::class);
+Route::post('/auth/apple', AuthenticateAppleUserAction::class);
 
 // The calendar apps cannot send a bearer token (nor the app key), the secret token of the membership in the address authenticates the feed.
 Route::get('calendar/{token}.ics', ExportHouseholdCalendarFeedAction::class)
