@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CharacterEnum;
 use App\Enums\LanguageEnum;
 use App\Enums\RoleEnum;
 use Illuminate\Database\Eloquent\Attributes\Appends;
@@ -15,7 +16,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 #[Appends(['name'])]
 #[Hidden(['workos_id', 'apple_id', 'apple_refresh_token'])]
-#[Fillable(['workos_id', 'apple_id', 'apple_refresh_token', 'first_name', 'last_name', 'nickname', 'email', 'avatar', 'language'])]
+#[Fillable(['workos_id', 'apple_id', 'apple_refresh_token', 'first_name', 'last_name', 'nickname', 'email', 'avatar', 'character', 'language'])]
 class User extends Authenticatable
 {
     use HasApiTokens;
@@ -23,6 +24,7 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
+            'character' => CharacterEnum::class,
             'language' => LanguageEnum::class,
             'anonymized_at' => 'datetime',
             'apple_refresh_token' => 'encrypted',
@@ -35,6 +37,14 @@ class User extends Authenticatable
     protected function name(): Attribute
     {
         return Attribute::get(fn (): string => $this->isAnonymized() ? __('app.deleted_user') : $this->nickname ?? $this->getFullName());
+    }
+
+    /**
+     * The chosen character, or the user's default one, see CharacterEnum::defaultFor().
+     */
+    public function houseCharacter(): CharacterEnum
+    {
+        return $this->character ?? CharacterEnum::defaultFor($this->id);
     }
 
     public function isAnonymized(): bool

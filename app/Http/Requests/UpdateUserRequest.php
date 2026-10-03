@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\CharacterEnum;
 use App\Enums\LanguageEnum;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -19,6 +20,8 @@ class UpdateUserRequest extends FormRequest
         return [
             'nickname' => ['nullable', 'string', 'min:3', 'max:255'],
             'language' => ['sometimes', Rule::enum(LanguageEnum::class)],
+            // null = no chosen character, the house view shows the default one, see User::houseCharacter().
+            'character' => ['sometimes', 'nullable', Rule::enum(CharacterEnum::class)],
         ];
     }
 }
