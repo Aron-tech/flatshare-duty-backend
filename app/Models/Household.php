@@ -98,6 +98,11 @@ class Household extends Model
         return $this->hasMany(Task::class);
     }
 
+    public function rooms(): HasMany
+    {
+        return $this->hasMany(HouseholdRoom::class);
+    }
+
     public function rewards(): HasMany
     {
         return $this->hasMany(Reward::class);

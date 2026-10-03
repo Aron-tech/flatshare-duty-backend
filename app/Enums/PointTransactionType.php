@@ -14,6 +14,7 @@ enum PointTransactionType: string
     case MISSED_TASK_PENALTY = 'missed_task_penalty';
     case PENALTY_TASK_COMPLETION = 'penalty_task_completion';
     case WEEKLY_GOAL_SETTLEMENT = 'weekly_goal_settlement';
+    case ROOM_CONTRIBUTION = 'room_contribution';
 
     /**
      * The points earned by doing tasks, they count towards the weekly goal.

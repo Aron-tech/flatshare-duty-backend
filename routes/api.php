@@ -9,6 +9,7 @@ use App\Actions\Calendar\ResetHouseholdCalendarSubscriptionAction;
 use App\Actions\ClaimTaskInstanceAction;
 use App\Actions\CompleteTaskInstanceAction;
 use App\Actions\GetHouseholdUserAction;
+use App\Actions\House\ContributeToRoomAction;
 use App\Actions\House\GetHouseStateAction;
 use App\Actions\Household\DeleteHouseholdAction;
 use App\Actions\Household\GenerateHouseholdQrCodeAction;
@@ -105,6 +106,7 @@ Route::middleware(['auth:sanctum', SetAppLocaleMiddleware::class])->group(functi
         Route::get('/stats', GetHouseholdStatsAction::class);
         Route::get('/activity', ListHouseholdActivityAction::class);
         Route::get('/house', GetHouseStateAction::class);
+        Route::post('/house/rooms/{room}/contribute', ContributeToRoomAction::class);
 
         Route::get('/sticker-album', GetStickerAlbumAction::class);
         Route::post('/sticker-album/seen', MarkStickersSeenAction::class);

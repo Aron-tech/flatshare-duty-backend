@@ -5,8 +5,11 @@ namespace App\Actions\House;
 use App\Actions\HouseholdStats\GetHouseholdStatsAction;
 use App\Actions\HouseholdStats\ListHouseholdActivityAction;
 use App\Enums\HouseMoodEnum;
+use App\Enums\HouseRoomEnum;
 use App\Models\Household;
+use App\Models\HouseholdRoom;
 use App\Models\HouseholdUser;
+use App\Models\RoomContribution;
 use App\Models\TaskInstance;
 use App\Models\User;
 use App\Models\WeeklyPointGoal;
@@ -47,6 +50,7 @@ class GetHouseStateAction
      *     zones: list<array{category_id: ?int, category_icon: ?string, category_name: ?string, open: int, due_today: int, overdue: int, mess_level: int}>,
      *     members: list<array{user_id: int, name: string, role: string, character: string, is_me: bool}>,
      *     recent_completions: list<array{id: int, user_id: int, category_icon: ?string, completed_at: string}>,
+     *     rooms: list<array{key: string, price: int, collected: int, unlocked: bool, zones: list<string>, contributors: list<array{user_id: int, amount: int}>}>,
      * }
      */
     public function handle(User $user, Household $household): array
@@ -79,7 +83,43 @@ class GetHouseStateAction
                     'completed_at' => $activity['completed_at'],
                 ])
                 ->all(),
+            'rooms' => $this->rooms($household),
         ];
+    }
+
+    /**
+     * Every extra room in HouseRoomEnum order with the points collected so far and who put in how much.
+     *
+     * @return list<array{key: string, price: int, collected: int, unlocked: bool, zones: list<string>, contributors: list<array{user_id: int, amount: int}>}>
+     */
+    public function rooms(Household $household): array
+    {
+        $household_rooms = $household->rooms()->get()->keyBy(fn (HouseholdRoom $room): string => $room->room->value);
+        $contributors = RoomContribution::query()
+            ->whereIn('household_room_id', $household_rooms->pluck('id'))
+            ->selectRaw('household_room_id, user_id, sum(amount) as amount')
+            ->groupBy('household_room_id', 'user_id')
+            ->orderByDesc('amount')
+            ->get()
+            ->groupBy('household_room_id');
+
+        return collect(HouseRoomEnum::cases())
+            ->map(function (HouseRoomEnum $room) use ($household_rooms, $contributors): array {
+                $household_room = $household_rooms->get($room->value);
+
+                return [
+                    'key' => $room->value,
+                    'price' => $room->price(),
+                    'collected' => $household_room->collected ?? 0,
+                    'unlocked' => $household_room?->unlocked_at !== null,
+                    'zones' => $room->zones(),
+                    'contributors' => $household_room === null ? [] : ($contributors->get($household_room->id) ?? collect())
+                        ->map(fn (RoomContribution $contribution): array => ['user_id' => $contribution->user_id, 'amount' => (int) $contribution->amount])
+                        ->values()
+                        ->all(),
+                ];
+            })
+            ->all();
     }
 
     /**
