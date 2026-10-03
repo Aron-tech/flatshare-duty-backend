@@ -12,10 +12,8 @@ class SendPushNotificationAction
     use AsAction;
 
     /**
-     * Push értesítést ad sorba a megadott felhasználók összes eszközére.
-     *
      * @param  Collection<int, int>|array<int, int>  $userIds
-     * @param  array<string, mixed>  $data  kliensoldali payload (pl. útvonal a navigáláshoz)
+     * @param  array<string, mixed>  $data  client-side payload, e.g. a route to navigate to
      */
     public function handle(Collection|array $userIds, string $title, string $body, array $data = []): void
     {

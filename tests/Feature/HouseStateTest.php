@@ -47,7 +47,7 @@ function houseInstance(Household $household, ?Category $category, array $attribu
         'difficulty' => 'easy',
         'is_recurring' => false,
     ]);
-    // A TaskObserver létrehozza az első (határidő nélküli) példányt, ezt használjuk.
+    // TaskObserver creates the first instance (no due date), so reuse it.
     $instance = $task->taskInstances()->firstOrFail();
     $instance->update($attributes);
 
@@ -55,7 +55,7 @@ function houseInstance(Household $household, ?Category $category, array $attribu
 }
 
 beforeEach(function () {
-    // Szerda délelőtt, hogy a "ma esedékes" ne csússzon át a következő napra.
+    // Wednesday morning, so "due today" does not slip into the next day.
     $this->travelTo(CarbonImmutable::parse('2026-10-07 10:00', 'Europe/Budapest'));
     $this->user = houseUser('Me');
     $this->household = Household::create(['name' => 'Home', 'join_code' => '0000000001', 'created_by' => $this->user->id]);
@@ -84,7 +84,7 @@ it('rates the mess of each task category from its open instances', function () {
         ->and($zones['bath'])->toMatchArray(['overdue' => 1, 'mess_level' => 2])
         ->and($zones['shirt'])->toMatchArray(['due_today' => 1, 'overdue' => 0, 'mess_level' => 1])
         ->and($zones['trash-2'])->toMatchArray(['open' => 1, 'mess_level' => 0])
-        // Egy, de 48 óránál régebben lejárt feladat is teljes rendetlenség.
+        // A single task overdue by more than 48 hours is already full mess.
         ->and($zones['none'])->toMatchArray(['category_id' => null, 'overdue' => 1, 'mess_level' => 3]);
 });
 
@@ -103,7 +103,7 @@ it('gets sad when the house is a mess and the household is behind the pace', fun
     foreach ([$kitchen, $kitchen, $bathroom, $bathroom] as $category) {
         houseInstance($this->household, $category, ['due_at' => now()->subHour()]);
     }
-    // Egy ismétlődő feladat heti célt ad, amiből szerdáig semmi sem teljesült.
+    // A recurring task sets a weekly goal of which nothing was completed by Wednesday.
     Task::create([
         'household_id' => $this->household->id,
         'created_by' => $this->user->id,
@@ -117,7 +117,7 @@ it('gets sad when the house is a mess and the household is behind the pace', fun
 
     $this->getJson("/api/households/{$this->household->id}/house")
         ->assertOk()
-        // 100 − 8 × (3 + 3) rendetlenség − 15 a tempó miatt
+        // 100 − 8 × (3 + 3) mess − 15 for the pace
         ->assertJsonPath('mood.score', 37)
         ->assertJsonPath('mood.band', 'grumpy')
         ->assertJsonPath('mood.behind_pace', true);

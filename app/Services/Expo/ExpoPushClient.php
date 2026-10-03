@@ -10,8 +10,8 @@ class ExpoPushClient
     public const int MAX_MESSAGES_PER_REQUEST = 100;
 
     /**
-     * @param  array<int, array<string, mixed>>  $messages  legfeljebb 100 elem
-     * @return array<int, array<string, mixed>> az üzenetekkel azonos sorrendű ticketek
+     * @param  array<int, array<string, mixed>>  $messages  at most 100 items
+     * @return array<int, array<string, mixed>> tickets in the same order as the messages
      */
     public function send(array $messages): array
     {

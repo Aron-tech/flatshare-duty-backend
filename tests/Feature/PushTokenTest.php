@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
 
 function makeUser(): User
 {
-    // A User modell `language` cast-ja jelenleg hibás, ezért közvetlenül szúrjuk be.
+    // The User `language` cast is currently broken, so insert directly.
     $id = DB::table('users')->insertGetId([
         'workos_id' => 'user_'.uniqid(),
         'first_name' => 'Test',

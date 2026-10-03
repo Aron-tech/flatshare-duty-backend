@@ -7,9 +7,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::table('reward_redemptions', function (Blueprint $table) {
@@ -21,9 +18,6 @@ return new class extends Migration
         DB::table('reward_redemptions')->update(['fulfilled_at' => DB::raw('created_at')]);
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('reward_redemptions', function (Blueprint $table) {

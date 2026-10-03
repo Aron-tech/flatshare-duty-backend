@@ -22,9 +22,6 @@ class TaskPolicy
         return $this->allowIf($role !== null && $role !== RoleEnum::CHILD);
     }
 
-    /**
-     * Like editing, a child member cannot delete tasks.
-     */
     public function delete(User $user, Task $task): Response
     {
         return $this->update($user, $task);

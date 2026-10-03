@@ -25,7 +25,7 @@ class UserController extends Controller
     {
         DB::transaction(fn (): bool => $user->update($request->validated()));
 
-        // A nyelvváltás után a válasz már az új nyelven jöjjön.
+        // So the response is already in the new language.
         app()->setLocale($user->language->value);
 
         return ['user' => $user, 'message' => __('app.success_action')];

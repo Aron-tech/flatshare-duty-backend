@@ -10,9 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * A tag heti vagy havi (a háztartás beállítása szerinti) minimum pontszáma a háztartásban, az időszak lezárásakor a szerzett ponttal és a hiánnyal együtt.
- */
 #[Fillable(['household_id', 'user_id', 'week_starts_at', 'target_points', 'earned_points', 'shortfall_points', 'reminded_at', 'closed_at'])]
 class WeeklyPointGoal extends Model
 {
@@ -125,9 +122,6 @@ class WeeklyPointGoal extends Model
         return $this->belongsTo(User::class);
     }
 
-    /**
-     * A hiány miatt kiosztott büntető feladatok.
-     */
     public function penaltyTaskInstanceUsers(): HasMany
     {
         return $this->hasMany(TaskInstanceUser::class);

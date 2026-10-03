@@ -7,8 +7,6 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
-     *
      * The users signing in with the native Sign in with Apple have no WorkOS user, they are identified by Apple's `sub`.
      * The Apple refresh token is kept (encrypted) only to revoke it when the account is deleted, as the App Store requires.
      */
@@ -21,9 +19,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {

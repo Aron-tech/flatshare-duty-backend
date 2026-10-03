@@ -74,7 +74,7 @@ Route::get('calendar/{token}.ics', ExportHouseholdCalendarFeedAction::class)
     ->withoutMiddleware(EnsureAppClientMiddleware::class)
     ->name('calendar.feed');
 
-// A nyelv a hitelesített user `language` mezőjéből jön, ezért az auth után fut.
+// The locale comes from the authenticated user's `language`, so it runs after auth.
 Route::middleware(['auth:sanctum', SetAppLocaleMiddleware::class])->group(function (): void {
     Route::get('user/me', [UserController::class, 'me']);
     Route::put('user/me', [UserController::class, 'update']);

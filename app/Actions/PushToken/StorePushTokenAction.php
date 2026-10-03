@@ -14,7 +14,7 @@ class StorePushTokenAction
     use AsAction;
 
     /**
-     * Egy token egyszerre csak egy felhasználóhoz tartozhat (eszközváltás/újrabejelentkezés esetén átkerül).
+     * A token belongs to one user at a time; on a device change or re-login it moves to the new user.
      *
      * @param  array{token: string, platform: string}  $data
      */

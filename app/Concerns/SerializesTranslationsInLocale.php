@@ -3,9 +3,8 @@
 namespace App\Concerns;
 
 /**
- * API válaszban a fordítható mezők az aktuális nyelven, stringként jelennek meg
- * (a spatie/laravel-translatable alapból az összes fordítást visszaadná).
- * A `HasTranslations` traittel együtt használandó.
+ * Serializes translatable fields as a string in the current locale (spatie/laravel-translatable returns all of them).
+ * Use together with the `HasTranslations` trait.
  */
 trait SerializesTranslationsInLocale
 {

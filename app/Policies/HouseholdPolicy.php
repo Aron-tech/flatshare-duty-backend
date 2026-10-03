@@ -47,9 +47,6 @@ class HouseholdPolicy
         return $this->allowIf($user->id !== $household->created_by, 'app.household_owner_cannot_leave');
     }
 
-    /**
-     * Only the creator can delete the household.
-     */
     public function delete(User $user, Household $household): Response
     {
         return $this->allowIf($user->id === $household->created_by);

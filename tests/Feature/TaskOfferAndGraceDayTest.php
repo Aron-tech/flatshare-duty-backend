@@ -205,7 +205,7 @@ it('turns a penalty into a point deduction when it is handed over', function () 
     $this->travel(1)->week();
     CloseWeeklyPointGoalsAction::run();
     $penalty = TaskInstanceUser::whereNotNull('weekly_point_goal_id')->sole();
-    // 50 pont a cél tagonként, a 90%-os vonal 45 pont.
+    // The goal is 50 points per member, so the 90% line is 45 points.
     expect($penalty->penalty_points)->toBe(45);
     setBalance($this->household, $this->user, 60);
 

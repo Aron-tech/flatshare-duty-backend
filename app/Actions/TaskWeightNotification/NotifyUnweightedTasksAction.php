@@ -26,11 +26,9 @@ class NotifyUnweightedTasksAction
     private const int MAX_LISTED_TASKS = 5;
 
     /**
-     * Tagonként és háztartásonként egy összesítő értesítést küld azokról a feladatokról,
-     * amelyeknél a tag még nem adott meg súlyozást, és még nem kapott róluk értesítést.
-     * Csak push tokennel rendelkező userek számítanak, így a token nélküliek a regisztráció után kapják meg.
+     * Only users with a push token count, so users without one are notified after they register one.
      *
-     * @return int az értesített (user, háztartás) párok száma
+     * @return int number of notified (user, household) pairs
      */
     public function handle(): int
     {

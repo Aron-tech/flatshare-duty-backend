@@ -91,7 +91,7 @@ it('recalculates the weekly minimum points when a task is added', function () {
         'recurrence_unit' => 'week',
     ])->assertOk();
 
-    // A csütörtökön hozzáadott feladatból csak a hét hátralévő 4/7 része számít.
+    // Of a task added on Thursday only the remaining 4/7 of the week counts.
     expect(goalOf($this->household, $this->user)->target_points)->toBe(70 + 40);
     $this->getJson("/api/households/{$this->household->id}/me")->assertJsonPath('min_points', 110);
 });

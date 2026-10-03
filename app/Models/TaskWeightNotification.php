@@ -6,9 +6,6 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * Jelzi, hogy a user már kapott push értesítést a feladat hiányzó súlyozásáról.
- */
 #[Fillable(['task_id', 'user_id'])]
 class TaskWeightNotification extends Model
 {

@@ -75,7 +75,7 @@
                 @include('public.partials.store-buttons')
             </div>
 
-            {{-- Az alkalmazás Kezdőlapja (flatshare-client: app/(tabs)/index.tsx) a valódi komponensek felépítésével és szövegeivel. --}}
+            {{-- Mirrors the app's Home screen (flatshare-client: app/(tabs)/index.tsx). --}}
             <div class="phone-float">
                 <div class="phone" aria-hidden="true" data-demo>
                     <div class="phone-screen">
@@ -252,7 +252,7 @@
                 return;
             }
 
-            // Ugyanaz, mint az appban: 84/120 pontról a mosogatás (+15) lezárása 99/120-ra visz.
+            // Same as in the app: completing the dishes (+15) takes 84/120 to 99/120.
             const goal = 120;
             const start = 84;
             const reward = 15;

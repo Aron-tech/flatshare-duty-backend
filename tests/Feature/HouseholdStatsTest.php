@@ -100,7 +100,7 @@ it('returns the cycle totals and the members ordered by points', function () {
 
 it('lists the overdue claims and the charged penalties', function () {
     $overdue = statsInstance($this->household, ['due_at' => now()->subDay()]);
-    // A határidő előtt vállalta; a határidő utáni vállalás mentés, nem büntetés.
+    // Taken before the deadline; taking it after the deadline is a rescue, not a penalty.
     $overdue->taskInstanceUsers()->create(['user_id' => $this->other->id])->forceFill(['created_at' => now()->subDays(2)])->save();
     statsInstance($this->household, ['due_at' => now()->subDay()])->taskInstanceUsers()->create(['user_id' => $this->user->id]);
     statsInstance($this->household, ['due_at' => now()->addDay()])->taskInstanceUsers()->create(['user_id' => $this->other->id]);

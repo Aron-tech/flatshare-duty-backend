@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
- * A tag felajánlja a vállalását a többieknek, a felajánlott pontot zárolva (escrow), lásd StoreTaskOfferAction.
+ * The offered points are held in escrow, see StoreTaskOfferAction.
  */
 #[Fillable(['household_id', 'task_instance_user_id', 'offered_by', 'target_user_id', 'accepted_by', 'points', 'penalty_points', 'status', 'accepted_at', 'resolved_at'])]
 class TaskOffer extends Model

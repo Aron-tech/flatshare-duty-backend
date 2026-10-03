@@ -9,9 +9,6 @@ return new class extends Migration
 {
     private const array TABLES = ['households', 'tasks', 'task_instances', 'task_instance_users', 'rewards'];
 
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         foreach (self::TABLES as $table_name) {
@@ -27,9 +24,6 @@ return new class extends Migration
         DB::statement('create unique index tasks_household_id_name_unique on tasks (household_id, name) where deleted_at is null');
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         DB::statement('drop index tasks_household_id_name_unique');
